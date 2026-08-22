@@ -1,0 +1,286 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the ScholarAI platform.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user."
+        },
+        "email": {
+          "type": "string",
+          "description": "User's email address.",
+          "format": "email"
+        },
+        "name": {
+          "type": "string",
+          "description": "User's full name."
+        },
+        "profileId": {
+          "type": "string",
+          "description": "Reference to UserProfile. (Relationship: User 1:1 UserProfile)"
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "name",
+        "profileId"
+      ]
+    },
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Represents the profile information for a user, including educational details and preferences.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user profile."
+        },
+        "course": {
+          "type": "string",
+          "description": "User's course of study (e.g., Bachelors, Masters, PhD)."
+        },
+        "income": {
+          "type": "number",
+          "description": "User's annual income."
+        },
+        "category": {
+          "type": "string",
+          "description": "User's category (e.g., General, OBC, SC/ST)."
+        },
+        "marksPercent": {
+          "type": "number",
+          "description": "User's marks percentage."
+        }
+      },
+      "required": [
+        "id",
+        "course",
+        "income",
+        "category",
+        "marksPercent"
+      ]
+    },
+    "Scholarship": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Scholarship",
+      "type": "object",
+      "description": "Represents a scholarship opportunity.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the scholarship."
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the scholarship."
+        },
+        "provider": {
+          "type": "string",
+          "description": "Provider of the scholarship (e.g., Government, Private Tech Foundation)."
+        },
+        "eligibleCourses": {
+          "type": "array",
+          "description": "List of eligible courses for the scholarship.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "incomeLimit": {
+          "type": "number",
+          "description": "Income limit for scholarship eligibility."
+        },
+        "deadline": {
+          "type": "string",
+          "description": "Application deadline for the scholarship.",
+          "format": "date-time"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the scholarship."
+        },
+        "applyLink": {
+          "type": "string",
+          "description": "Link to apply for the scholarship.",
+          "format": "uri"
+        },
+        "tagIds": {
+          "type": "array",
+          "description": "References to Tags. (Relationship: Scholarship N:N Tag)",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "provider",
+        "eligibleCourses",
+        "incomeLimit",
+        "deadline",
+        "description",
+        "applyLink"
+      ]
+    },
+    "Recommendation": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Recommendation",
+      "type": "object",
+      "description": "Represents a scholarship recommendation for a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the recommendation."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Recommendation)"
+        },
+        "scholarshipId": {
+          "type": "string",
+          "description": "Reference to Scholarship. (Relationship: Scholarship 1:N Recommendation)"
+        },
+        "recommendationDate": {
+          "type": "string",
+          "description": "Date when the recommendation was made.",
+          "format": "date-time"
+        },
+        "score": {
+          "type": "number",
+          "description": "The recommendation score."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "scholarshipId",
+        "recommendationDate"
+      ]
+    },
+    "Tag": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Tag",
+      "type": "object",
+      "description": "Represents a tag or keyword associated with a scholarship.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the tag."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the tag (e.g., merit, stem, women)."
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Collection of user accounts.  Includes standard user profile data.  Owned by the user.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/profile/{profileId}",
+        "definition": {
+          "entityName": "UserProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Collection of user profiles, associated with a specific user. Owned by the user.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            },
+            {
+              "name": "profileId",
+              "description": "The unique identifier of the user profile."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/recommendations/{recommendationId}",
+        "definition": {
+          "entityName": "Recommendation",
+          "schema": {
+            "$ref": "#/backend/entities/Recommendation"
+          },
+          "description": "Collection of scholarship recommendations for a specific user. Owned by the user.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            },
+            {
+              "name": "recommendationId",
+              "description": "The unique identifier of the recommendation."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/scholarships/{scholarshipId}",
+        "definition": {
+          "entityName": "Scholarship",
+          "schema": {
+            "$ref": "#/backend/entities/Scholarship"
+          },
+          "description": "Collection of scholarships available in the system. Publicly accessible.",
+          "params": [
+            {
+              "name": "scholarshipId",
+              "description": "The unique identifier of the scholarship."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/tags/{tagId}",
+        "definition": {
+          "entityName": "Tag",
+          "schema": {
+            "$ref": "#/backend/entities/Tag"
+          },
+          "description": "Collection of tags or keywords associated with scholarships. Publicly accessible.",
+          "params": [
+            {
+              "name": "tagId",
+              "description": "The unique identifier of the tag."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore data structure is designed to prioritize authorization independence, clarity, and security. It utilizes denormalization and structural segregation to achieve these goals.\n\n**Authorization Independence:** The structure avoids hierarchical authorization dependencies (`get()`) by denormalizing relevant authorization data. For example, access to a recommendation depends on the user and scholarship. The user-recommendation relation is achieved with the /users/{userId}/recommendations/{recommendationId} path. Access to the scholarship data is public. This structure ensures that authorization checks can be performed independently without requiring reads from parent documents.\n\n**Structural Segregation:** The structure segregates data based on security requirements. All documents within a collection share the same security posture. User profiles and recommendations are stored in user-specific subcollections, enabling path-based ownership and simplified security rules.\n\n**QAPs Support:** The structure supports secure list operations (QAPs) by ensuring that rules are not filters. Access to scholarships is provided at the root, meaning that all documents share the same security posture. The /users/{userId}/recommendations/{recommendationId} ensures only the user can access this list."
+  }
+}
