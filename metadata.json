@@ -1,4 +1,7 @@
 {
-  "name": "studio-3697980282",
-  "description": "App imported from Firebase Studio"
+  "name": "ScholarAI",
+  "description": "AI-powered scholarship finder and application assistant",
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

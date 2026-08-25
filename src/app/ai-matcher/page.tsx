@@ -26,16 +26,20 @@ export default function AIMatcherPage() {
   const handleSearch = (query: string) => {
     setHasSearched(true);
     startSearchTransition(async () => {
-      const result = await searchScholarshipsAction(query, sampleScholarships);
-      if (Array.isArray(result) && "error" in result) {
+      try {
+        const result = await searchScholarshipsAction(query, sampleScholarships);
+        if (Array.isArray(result)) {
+          setScholarships(result);
+        } else {
+          setScholarships([]);
+        }
+      } catch (err) {
         toast({
           variant: "destructive",
           title: "Search Error",
-          description: (result as any).error,
+          description: "Failed to search scholarships. Please try again.",
         });
         setScholarships([]);
-      } else {
-        setScholarships(result as Scholarship[]);
       }
     });
   };

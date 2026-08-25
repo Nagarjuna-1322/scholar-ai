@@ -15,13 +15,15 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar, Eye } from "lucide-react";
 
 export function ScholarshipList({
-  scholarships,
+  scholarships = [],
   onSelectScholarship,
 }: {
-  scholarships: Scholarship[];
+  scholarships?: Scholarship[];
   onSelectScholarship: (scholarship: Scholarship) => void;
 }) {
-  if (scholarships.length === 0) {
+  const safeScholarships = Array.isArray(scholarships) ? scholarships : [];
+
+  if (safeScholarships.length === 0) {
     return (
       <div className="text-center py-16 bg-card rounded-lg border">
         <p className="text-lg font-semibold">No scholarships found</p>
@@ -32,7 +34,7 @@ export function ScholarshipList({
 
   return (
     <div className="space-y-4">
-      {scholarships.map((s) => (
+      {safeScholarships.map((s) => (
         <Card key={s.id} className="hover:shadow-lg transition-shadow">
           <CardHeader>
             <div className="flex justify-between items-start gap-4">

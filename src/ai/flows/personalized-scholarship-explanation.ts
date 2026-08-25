@@ -33,26 +33,6 @@ export async function explainScholarshipRecommendation(input: ExplainScholarship
   return explainScholarshipRecommendationFlow(input);
 }
 
-const prompt = ai.definePrompt({
-  name: 'explainScholarshipRecommendationPrompt',
-  input: {schema: ExplainScholarshipRecommendationInputSchema},
-  output: {schema: ExplainScholarshipRecommendationOutputSchema},
-  prompt: `You are an AI assistant that explains why a scholarship was recommended to a user.
-
-  Scholarship Title: {{{scholarshipTitle}}}
-  Scholarship Provider: {{{scholarshipProvider}}}
-  Scholarship Description: {{{scholarshipDescription}}}
-
-  User Profile: 
-  Name: {{{userProfile.name}}}
-  Course: {{{userProfile.course}}}
-  Income: {{{userProfile.income}}}
-  Marks Percentage: {{{userProfile.marks_percent}}}
-
-  Explain why this scholarship was recommended to the user, based on their profile and the scholarship details. Be concise and specific.
-  `,
-});
-
 const explainScholarshipRecommendationFlow = ai.defineFlow(
   {
     name: 'explainScholarshipRecommendationFlow',
@@ -60,7 +40,38 @@ const explainScholarshipRecommendationFlow = ai.defineFlow(
     outputSchema: ExplainScholarshipRecommendationOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
-    return output!;
+    try {
+      const response = await ai.generate({
+        prompt: `You are an AI scholarship advisor. Explain concisely and warmly why this scholarship is a great match for the student.
+
+Scholarship Title: ${input.scholarshipTitle}
+Provider: ${input.scholarshipProvider}
+Description: ${input.scholarshipDescription}
+
+Student Profile:
+- Name: ${input.userProfile.name || "Student"}
+- Course / Level: ${input.userProfile.course}
+- Annual Family Income: ₹${input.userProfile.income.toLocaleString()}
+- Academic Marks: ${input.userProfile.marks_percent}%
+
+Provide a concise, 2-3 sentence personalized explanation highlighting the student's eligibility criteria and strengths.`,
+        output: {
+          schema: ExplainScholarshipRecommendationOutputSchema,
+        },
+      });
+
+      if (response.output?.explanation) {
+        return response.output;
+      }
+      return {
+        explanation: `This scholarship matches your ${input.userProfile.course} program, academic score (${input.userProfile.marks_percent}%), and financial eligibility criteria from ${input.scholarshipProvider}.`,
+      };
+    } catch (err) {
+      console.warn("AI explanation error, using fallback explanation:", err);
+      return {
+        explanation: `This scholarship from ${input.scholarshipProvider} matches your current ${input.userProfile.course} enrollment and academic profile (${input.userProfile.marks_percent}%).`,
+      };
+    }
   }
 );
+
