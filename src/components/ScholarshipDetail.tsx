@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sparkles, Bot, Loader2, ArrowRight } from "lucide-react";
 import { ScholarshipStatusTracker } from "@/components/ScholarshipStatusTracker";
+import { SetReminderButton } from "@/components/SetReminderButton";
 
 export function ScholarshipDetail({
   scholarship,
@@ -72,11 +73,14 @@ export function ScholarshipDetail({
         <SheetHeader className="p-6 pb-2">
           <SheetTitle className="text-2xl font-headline">{scholarship.title}</SheetTitle>
           <SheetDescription asChild>
-            <div className="flex items-center gap-4 pt-1 text-sm text-muted-foreground">
-              <span>{scholarship.provider}</span>
-              <Badge variant={daysLeft < 30 ? "destructive" : "secondary"}>
-                Deadline: {scholarship.deadline} ({daysLeft} days left)
-              </Badge>
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <span className="font-medium text-foreground">{scholarship.provider}</span>
+                <Badge variant={daysLeft < 30 ? "destructive" : "secondary"}>
+                  Deadline: {scholarship.deadline} ({daysLeft} days left)
+                </Badge>
+              </div>
+              <SetReminderButton scholarship={scholarship} size="sm" variant="outline" />
             </div>
           </SheetDescription>
         </SheetHeader>
@@ -136,8 +140,11 @@ export function ScholarshipDetail({
             </div>
           </div>
         </div>
-        <SheetFooter className="p-6 bg-card border-t mt-auto">
-           <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+        <SheetFooter className="p-6 bg-card border-t mt-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+           <div className="flex items-center gap-2">
+             <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+             <SetReminderButton scholarship={scholarship} variant="outline" />
+           </div>
            <a href={scholarship.apply_link} target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto">
               <Button className="w-full">
                   Apply Now
