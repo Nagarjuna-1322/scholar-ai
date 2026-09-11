@@ -12,9 +12,10 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Eye } from "lucide-react";
+import { Calendar, Eye, ExternalLink } from "lucide-react";
 import { ScholarshipStatusTracker, StatusBadge } from "@/components/ScholarshipStatusTracker";
 import { useApplicationTracker } from "@/contexts/ApplicationTrackerContext";
+import { useToast } from "@/hooks/use-toast";
 
 export function ScholarshipList({
   scholarships = [],
@@ -24,7 +25,8 @@ export function ScholarshipList({
   onSelectScholarship: (scholarship: Scholarship) => void;
 }) {
   const safeScholarships = Array.isArray(scholarships) ? scholarships : [];
-  const { getStatus } = useApplicationTracker();
+  const { getStatus, setStatus } = useApplicationTracker();
+  const { toast } = useToast();
 
   if (safeScholarships.length === 0) {
     return (
@@ -50,10 +52,31 @@ export function ScholarshipList({
                   </div>
                   <CardDescription>{s.provider}</CardDescription>
                 </div>
-                <Button size="sm" variant="secondary" onClick={() => onSelectScholarship(s)}>
-                  <Eye className="mr-2 h-4 w-4"/>
-                  View Details
-                </Button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button size="sm" variant="outline" onClick={() => onSelectScholarship(s)}>
+                    <Eye className="mr-1.5 h-3.5 w-3.5"/>
+                    View Info
+                  </Button>
+                  <a
+                    href={s.apply_link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => {
+                      if (!status) {
+                        setStatus(s.id, "Applied", s.title);
+                      }
+                      toast({
+                        title: `Redirecting to ${s.provider}`,
+                        description: `Opening company scholarship site in a new tab. Status marked as 'Applied'!`,
+                      });
+                    }}
+                  >
+                    <Button size="sm" className="gap-1.5 font-medium">
+                      <span>Apply Now</span>
+                      <ExternalLink className="h-3.5 w-3.5"/>
+                    </Button>
+                  </a>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">

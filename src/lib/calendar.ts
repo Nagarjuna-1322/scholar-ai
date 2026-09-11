@@ -35,7 +35,6 @@ export function getGoogleCalendarUrl(data: CalendarEventData): string {
   const month = parseInt(parts[1], 10) - 1;
   const day = parseInt(parts[2], 10);
 
-  // All day event: start YYYYMMDD, end next day YYYYMMDD
   const startDate = new Date(Date.UTC(year, month, day));
   const endDate = new Date(Date.UTC(year, month, day + 1));
 
@@ -63,7 +62,6 @@ export function downloadIcsFile(data: CalendarEventData): void {
   const month = parseInt(parts[1], 10) - 1;
   const day = parseInt(parts[2], 10);
 
-  // Set event for deadline day 9:00 AM - 6:00 PM local
   const start = new Date(year, month, day, 9, 0, 0);
   const end = new Date(year, month, day, 18, 0, 0);
   const now = new Date();
@@ -143,7 +141,6 @@ export async function triggerSystemNotification({
       });
       return { status: "granted" };
     } catch {
-      // Some environments restrict new Notification inside iframe without service worker
       return { status: "granted" };
     }
   }

@@ -6,10 +6,11 @@ import { Scholarship, sampleScholarships } from "@/lib/data";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Lightbulb, Eye } from "lucide-react";
+import { Lightbulb, Eye, ExternalLink } from "lucide-react";
 import { ScholarshipDetail } from "@/components/ScholarshipDetail";
 import { StatusBadge } from "@/components/ScholarshipStatusTracker";
 import { useApplicationTracker } from "@/contexts/ApplicationTrackerContext";
+import { useToast } from "@/hooks/use-toast";
 
 type ScoredScholarship = Scholarship & { score: number };
 
@@ -29,7 +30,8 @@ function recommendScholarships(user: UserProfile, list: Scholarship[]): ScoredSc
 
 export default function RecommendationsPage() {
   const { profile, setProfileOpen } = useProfile();
-  const { getStatus } = useApplicationTracker();
+  const { getStatus, setStatus } = useApplicationTracker();
+  const { toast } = useToast();
   
   const recommendations = useMemo(() => {
     return recommendScholarships(profile, sampleScholarships);
@@ -99,9 +101,30 @@ export default function RecommendationsPage() {
                               </div>
                               <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{r.description}</p>
                             </div>
-                            <Button size="sm" variant="outline" className="mt-4 w-fit" onClick={() => handleSelectScholarship(r)}>
-                                <Eye className="mr-2 h-4 w-4"/> View Details
-                            </Button>
+                            <div className="mt-4 pt-3 border-t flex items-center justify-between gap-2 flex-wrap">
+                              <Button size="sm" variant="outline" onClick={() => handleSelectScholarship(r)}>
+                                <Eye className="mr-1.5 h-4 w-4"/> View Details
+                              </Button>
+                              <a
+                                href={r.apply_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={() => {
+                                  if (!status) {
+                                    setStatus(r.id, "Applied", r.title);
+                                  }
+                                  toast({
+                                    title: `Redirecting to ${r.provider}`,
+                                    description: `Opening official portal in a new tab. Status marked as 'Applied'!`,
+                                  });
+                                }}
+                              >
+                                <Button size="sm" className="gap-1.5">
+                                  <span>Apply on Portal</span>
+                                  <ExternalLink className="h-3.5 w-3.5"/>
+                                </Button>
+                              </a>
+                            </div>
                         </div>
                       );
                     })}

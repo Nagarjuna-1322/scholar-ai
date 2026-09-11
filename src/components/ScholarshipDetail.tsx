@@ -3,6 +3,8 @@
 import { useState, useTransition, useEffect } from "react";
 import type { Scholarship } from "@/lib/data";
 import { useProfile } from "@/contexts/ProfileContext";
+import { useApplicationTracker } from "@/contexts/ApplicationTrackerContext";
+import { useToast } from "@/hooks/use-toast";
 import { daysUntil } from "@/lib/utils";
 import { explainRecommendationAction, generateEssayAction } from "@/app/actions";
 import {
@@ -18,7 +20,15 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sparkles, Bot, Loader2, ArrowRight } from "lucide-react";
+import {
+  Sparkles,
+  Bot,
+  Loader2,
+  ArrowRight,
+  ExternalLink,
+  Building2,
+  Globe,
+} from "lucide-react";
 import { ScholarshipStatusTracker } from "@/components/ScholarshipStatusTracker";
 import { SetReminderButton } from "@/components/SetReminderButton";
 
@@ -32,6 +42,8 @@ export function ScholarshipDetail({
   onOpenChange: (isOpen: boolean) => void;
 }) {
   const { profile } = useProfile();
+  const { toast } = useToast();
+  const tracker = useApplicationTracker();
   const [explanation, setExplanation] = useState("");
   const [essay, setEssay] = useState("");
   const [isExplanationLoading, startExplanationTransition] = useTransition();
@@ -63,19 +75,38 @@ export function ScholarshipDetail({
     });
   };
 
+  const handleApplyRedirect = () => {
+    if (!scholarship) return;
+    const currentStatus = tracker.getStatus(scholarship.id);
+    if (!currentStatus) {
+      tracker.setStatus(scholarship.id, "Applied", scholarship.title);
+    }
+    toast({
+      title: `Redirecting to ${scholarship.provider}`,
+      description: `Opening the official application site in a new tab. Status updated to 'Applied'.`,
+    });
+  };
+
   if (!scholarship) return null;
 
   const daysLeft = daysUntil(scholarship.deadline);
 
+  let portalDomain = "";
+  try {
+    portalDomain = new URL(scholarship.apply_link).hostname.replace(/^www\./, "");
+  } catch {
+    portalDomain = scholarship.provider;
+  }
+
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-xl md:max-w-2xl p-0 flex flex-col">
-        <SheetHeader className="p-6 pb-2">
+        <SheetHeader className="p-6 pb-3 border-b bg-card">
           <SheetTitle className="text-2xl font-headline">{scholarship.title}</SheetTitle>
           <SheetDescription asChild>
             <div className="flex flex-wrap items-center justify-between gap-3 pt-2 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <span className="font-medium text-foreground">{scholarship.provider}</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold text-foreground">{scholarship.provider}</span>
                 <Badge variant={daysLeft < 30 ? "destructive" : "secondary"}>
                   Deadline: {scholarship.deadline} ({daysLeft} days left)
                 </Badge>
@@ -84,19 +115,66 @@ export function ScholarshipDetail({
             </div>
           </SheetDescription>
         </SheetHeader>
-        <div className="flex-grow overflow-y-auto px-6 pb-6 space-y-6">
-          <p className="text-sm text-foreground">{scholarship.description}</p>
+        <div className="flex-grow overflow-y-auto px-6 py-6 space-y-6">
+          {/* Direct Company Scholarship Portal Card */}
+          <div className="p-4 rounded-xl border border-primary/20 bg-primary/5 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-primary uppercase tracking-wider">
+                  <Globe className="h-3.5 w-3.5" />
+                  <span>Official Application Portal</span>
+                </div>
+                <h4 className="font-bold text-foreground text-base">
+                  {scholarship.provider}
+                </h4>
+                <p className="text-xs text-muted-foreground">
+                  Apply directly on the company&apos;s verified scholarship portal. Students submit documents and track their progress on their host site.
+                </p>
+              </div>
+              <Badge variant="outline" className="text-[11px] bg-background text-primary border-primary/30 shrink-0">
+                Official Site
+              </Badge>
+            </div>
+
+            <div className="pt-2 border-t border-primary/10 flex flex-wrap items-center justify-between gap-2">
+              <div className="text-xs text-muted-foreground font-mono truncate max-w-[280px]">
+                {portalDomain}
+              </div>
+              <a
+                href={scholarship.apply_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={handleApplyRedirect}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+              >
+                <span>Visit Company Portal</span>
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-semibold mb-1.5 text-sm">About the Scholarship</h4>
+            <p className="text-sm text-foreground/90 leading-relaxed">{scholarship.description}</p>
+          </div>
+
           <div className="text-sm">
-              <h4 className="font-semibold mb-2">Eligibility</h4>
-              <ul className="list-disc pl-5 text-muted-foreground space-y-1">
-                  <li>Eligible Courses: {scholarship.eligible_courses.join(", ")}</li>
-                  <li>Max Family Income: ₹{scholarship.income_limit.toLocaleString()}</li>
-              </ul>
+            <h4 className="font-semibold mb-2">Eligibility Requirements</h4>
+            <ul className="list-disc pl-5 text-muted-foreground space-y-1">
+              <li>Eligible Courses: {scholarship.eligible_courses.join(", ")}</li>
+              <li>Max Family Income: ₹{scholarship.income_limit.toLocaleString()}</li>
+              <li>Official registration and verification directly on {scholarship.provider}&apos;s portal.</li>
+            </ul>
           </div>
+
           <div className="flex flex-wrap gap-2">
-            {scholarship.tags.map(tag => <Badge key={tag} variant="outline">{tag}</Badge>)}
+            {scholarship.tags.map((tag) => (
+              <Badge key={tag} variant="outline" className="capitalize">
+                {tag}
+              </Badge>
+            ))}
           </div>
-          
+
           <Separator />
 
           {/* Status Tracker */}
@@ -104,12 +182,14 @@ export function ScholarshipDetail({
             scholarshipId={scholarship.id}
             scholarshipTitle={scholarship.title}
           />
-          
+
           <Separator />
-          
+
           <div className="space-y-4">
-            <h4 className="font-semibold flex items-center gap-2"><Sparkles className="text-accent h-5 w-5" /> AI Tools</h4>
-            
+            <h4 className="font-semibold flex items-center gap-2">
+              <Sparkles className="text-accent h-5 w-5" /> AI Tools
+            </h4>
+
             <div className="p-4 border rounded-lg">
               <div className="flex justify-between items-center">
                 <p className="font-medium">Why is this for me?</p>
@@ -140,17 +220,27 @@ export function ScholarshipDetail({
             </div>
           </div>
         </div>
-        <SheetFooter className="p-6 bg-card border-t mt-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-           <div className="flex items-center gap-2">
-             <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
-             <SetReminderButton scholarship={scholarship} variant="outline" />
-           </div>
-           <a href={scholarship.apply_link} target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto">
-              <Button className="w-full">
-                  Apply Now
-                  <ArrowRight className="ml-2 h-4 w-4"/>
-              </Button>
-           </a>
+
+        <SheetFooter className="p-4 sm:p-6 bg-card border-t mt-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Close
+            </Button>
+            <SetReminderButton scholarship={scholarship} variant="outline" />
+          </div>
+
+          <a
+            href={scholarship.apply_link}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={handleApplyRedirect}
+            className="w-full sm:w-auto"
+          >
+            <Button className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 font-semibold shadow-sm gap-2">
+              <span>Apply on Official Portal</span>
+              <ExternalLink className="h-4 w-4" />
+            </Button>
+          </a>
         </SheetFooter>
       </SheetContent>
     </Sheet>

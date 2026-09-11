@@ -68,7 +68,6 @@ export function SetReminderButton({
 
   const daysLeft = daysUntil(scholarship.deadline);
 
-  // Load existing reminder state from localStorage
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -141,7 +140,6 @@ export function SetReminderButton({
     reminderDaysBefore: reminderDays,
   };
 
-  // 1. Google Calendar Handler
   const handleAddToGoogleCalendar = () => {
     const url = getGoogleCalendarUrl(eventData);
     window.open(url, "_blank", "noopener,noreferrer");
@@ -152,7 +150,6 @@ export function SetReminderButton({
     });
   };
 
-  // 2. Apple / Outlook (.ics) Handler
   const handleDownloadIcs = () => {
     downloadIcsFile(eventData);
     saveReminderToStorage(reminderDays, "calendar");
@@ -162,7 +159,6 @@ export function SetReminderButton({
     });
   };
 
-  // 3. System Notification Handler
   const handleTriggerSystemNotification = async () => {
     const reminderDateText =
       reminderDays === 0
@@ -296,7 +292,6 @@ export function SetReminderButton({
           </Label>
 
           <div className="grid gap-2">
-            {/* 1. Google Calendar Button */}
             <Button
               type="button"
               variant="outline"
@@ -319,7 +314,6 @@ export function SetReminderButton({
               <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
             </Button>
 
-            {/* 2. Apple / Outlook / iCal Button */}
             <Button
               type="button"
               variant="outline"
@@ -342,7 +336,6 @@ export function SetReminderButton({
               <Download className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
             </Button>
 
-            {/* 3. System / Browser Notification Button */}
             <Button
               type="button"
               variant="outline"
@@ -374,7 +367,6 @@ export function SetReminderButton({
           </div>
         </div>
 
-        {/* Existing Active Reminder Notice */}
         {activeReminder && (
           <div className="flex items-center justify-between p-2.5 rounded-md bg-muted/60 text-xs text-muted-foreground">
             <div className="flex items-center gap-2">
