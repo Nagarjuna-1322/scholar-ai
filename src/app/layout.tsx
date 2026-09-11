@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { ProfileProvider } from '@/contexts/ProfileContext';
+import { ApplicationTrackerProvider } from '@/contexts/ApplicationTrackerContext';
 import { AppLayout } from '@/components/AppLayout';
 
 export const metadata: Metadata = {
@@ -30,10 +31,12 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased">
           <ProfileProvider>
-            <AppLayout>
-              {children}
-            </AppLayout>
-            <Toaster />
+            <ApplicationTrackerProvider>
+              <AppLayout>
+                {children}
+              </AppLayout>
+              <Toaster />
+            </ApplicationTrackerProvider>
           </ProfileProvider>
       </body>
     </html>

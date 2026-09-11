@@ -19,6 +19,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sparkles, Bot, Loader2, ArrowRight } from "lucide-react";
+import { ScholarshipStatusTracker } from "@/components/ScholarshipStatusTracker";
 
 export function ScholarshipDetail({
   scholarship,
@@ -91,6 +92,14 @@ export function ScholarshipDetail({
           <div className="flex flex-wrap gap-2">
             {scholarship.tags.map(tag => <Badge key={tag} variant="outline">{tag}</Badge>)}
           </div>
+          
+          <Separator />
+
+          {/* Status Tracker */}
+          <ScholarshipStatusTracker
+            scholarshipId={scholarship.id}
+            scholarshipTitle={scholarship.title}
+          />
           
           <Separator />
           
