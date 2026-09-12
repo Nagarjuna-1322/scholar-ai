@@ -105,25 +105,25 @@ export default function RecommendationsPage() {
                               <Button size="sm" variant="outline" onClick={() => handleSelectScholarship(r)}>
                                 <Eye className="mr-1.5 h-4 w-4"/> View Details
                               </Button>
-                              <a
-                                href={r.apply_link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={() => {
-                                  if (!status) {
-                                    setStatus(r.id, "Applied", r.title);
-                                  }
-                                  toast({
-                                    title: `Redirecting to ${r.provider}`,
-                                    description: `Opening official portal in a new tab. Status marked as 'Applied'!`,
-                                  });
-                                }}
-                              >
-                                <Button size="sm" className="gap-1.5">
+                              <Button asChild size="sm" className="gap-1.5">
+                                <a
+                                  href={r.apply_link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={() => {
+                                    if (!status) {
+                                      setStatus(r.id, "Applied", r.title);
+                                    }
+                                    toast({
+                                      title: `Redirecting to ${r.provider}`,
+                                      description: `Opening official portal in a new tab. Status marked as 'Applied'!`,
+                                    });
+                                  }}
+                                >
                                   <span>Apply on Portal</span>
                                   <ExternalLink className="h-3.5 w-3.5"/>
-                                </Button>
-                              </a>
+                                </a>
+                              </Button>
                             </div>
                         </div>
                       );

@@ -15,13 +15,17 @@ const ScholarshipItemSchema = z.object({
   id: z.number(),
   title: z.string(),
   provider: z.string(),
+  category: z.enum(["Government", "Private"]).optional().default("Government"),
   eligible_courses: z.array(z.string()),
   income_limit: z.number(),
   deadline: z.string(),
   description: z.string(),
   apply_link: z.string(),
   tags: z.array(z.string()),
-});
+  amount: z.string().optional().default("Varies"),
+  education_level: z.string().optional(),
+  source_portal: z.string().optional(),
+}).passthrough();
 
 const IntelligentScholarshipSearchInputSchema = z.object({
   query: z.string().describe('The natural language query to search for scholarships.'),

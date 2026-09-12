@@ -121,18 +121,18 @@ export default function HistoryPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/ai-matcher">
-            <Button variant="outline" size="sm" className="gap-1.5">
+          <Button asChild variant="outline" size="sm" className="gap-1.5">
+            <Link href="/ai-matcher">
               <Bot className="h-4 w-4 text-primary" />
               <span>AI Matcher</span>
-            </Button>
-          </Link>
-          <Link href="/recommendations">
-            <Button size="sm" className="gap-1.5">
+            </Link>
+          </Button>
+          <Button asChild size="sm" className="gap-1.5">
+            <Link href="/recommendations">
               <Lightbulb className="h-4 w-4" />
               <span>Find More</span>
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
       </div>
 
@@ -291,18 +291,18 @@ export default function HistoryPage() {
                   : `You don't have any scholarships marked as "${activeTab}" right now. Switch tabs or mark a scholarship to see it here.`}
               </p>
               <div className="pt-3 flex flex-wrap gap-2 justify-center">
-                <Link href="/recommendations">
-                  <Button variant="default" size="sm" className="gap-1.5">
+                <Button asChild variant="default" size="sm" className="gap-1.5">
+                  <Link href="/recommendations">
                     <Lightbulb className="h-4 w-4" />
                     Browse Recommendations
-                  </Button>
-                </Link>
-                <Link href="/ai-matcher">
-                  <Button variant="outline" size="sm" className="gap-1.5">
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="sm" className="gap-1.5">
+                  <Link href="/ai-matcher">
                     <Bot className="h-4 w-4 text-primary" />
                     AI Scholarship Matcher
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
               </div>
             </div>
           </CardContent>
@@ -336,16 +336,16 @@ export default function HistoryPage() {
                       <Eye className="h-3.5 w-3.5" />
                       View Details
                     </Button>
-                    <a
-                      href={scholarship.apply_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <Button size="sm" variant="secondary" className="gap-1 text-xs">
+                    <Button asChild size="sm" variant="secondary" className="gap-1 text-xs">
+                      <a
+                        href={scholarship.apply_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
                         Portal
                         <ArrowUpRight className="h-3.5 w-3.5" />
-                      </Button>
-                    </a>
+                      </a>
+                    </Button>
                   </div>
                 </div>
               </CardHeader>

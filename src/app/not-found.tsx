@@ -8,9 +8,9 @@ export default function NotFound() {
       <p className="text-muted-foreground mt-2 mb-6">
         Could not find requested resource.
       </p>
-      <Link href="/">
-        <Button>Return Home</Button>
-      </Link>
+      <Button asChild>
+        <Link href="/">Return Home</Link>
+      </Button>
     </div>
   );
 }

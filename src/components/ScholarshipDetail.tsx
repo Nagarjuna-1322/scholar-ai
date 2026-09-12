@@ -102,6 +102,23 @@ export function ScholarshipDetail({
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-xl md:max-w-2xl p-0 flex flex-col">
         <SheetHeader className="p-6 pb-3 border-b bg-card">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <Badge
+              variant={scholarship.category === "Government" ? "default" : "secondary"}
+              className={
+                scholarship.category === "Government"
+                  ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                  : "bg-blue-600 text-white hover:bg-blue-700"
+              }
+            >
+              {scholarship.category === "Government" ? "🏛️ Govt of India" : "🏢 Private / CSR"}
+            </Badge>
+            {scholarship.amount && (
+              <Badge variant="outline" className="font-semibold text-primary border-primary/40 bg-primary/5">
+                Grant: {scholarship.amount}
+              </Badge>
+            )}
+          </div>
           <SheetTitle className="text-2xl font-headline">{scholarship.title}</SheetTitle>
           <SheetDescription asChild>
             <div className="flex flex-wrap items-center justify-between gap-3 pt-2 text-sm text-muted-foreground">
@@ -229,18 +246,17 @@ export function ScholarshipDetail({
             <SetReminderButton scholarship={scholarship} variant="outline" />
           </div>
 
-          <a
-            href={scholarship.apply_link}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={handleApplyRedirect}
-            className="w-full sm:w-auto"
-          >
-            <Button className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 font-semibold shadow-sm gap-2">
+          <Button asChild className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 font-semibold shadow-sm gap-2">
+            <a
+              href={scholarship.apply_link}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={handleApplyRedirect}
+            >
               <span>Apply on Official Portal</span>
               <ExternalLink className="h-4 w-4" />
-            </Button>
-          </a>
+            </a>
+          </Button>
         </SheetFooter>
       </SheetContent>
     </Sheet>

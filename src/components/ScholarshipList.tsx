@@ -57,25 +57,25 @@ export function ScholarshipList({
                     <Eye className="mr-1.5 h-3.5 w-3.5"/>
                     View Info
                   </Button>
-                  <a
-                    href={s.apply_link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => {
-                      if (!status) {
-                        setStatus(s.id, "Applied", s.title);
-                      }
-                      toast({
-                        title: `Redirecting to ${s.provider}`,
-                        description: `Opening company scholarship site in a new tab. Status marked as 'Applied'!`,
-                      });
-                    }}
-                  >
-                    <Button size="sm" className="gap-1.5 font-medium">
+                  <Button asChild size="sm" className="gap-1.5 font-medium">
+                    <a
+                      href={s.apply_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => {
+                        if (!status) {
+                          setStatus(s.id, "Applied", s.title);
+                        }
+                        toast({
+                          title: `Redirecting to ${s.provider}`,
+                          description: `Opening company scholarship site in a new tab. Status marked as 'Applied'!`,
+                        });
+                      }}
+                    >
                       <span>Apply Now</span>
                       <ExternalLink className="h-3.5 w-3.5"/>
-                    </Button>
-                  </a>
+                    </a>
+                  </Button>
                 </div>
               </div>
             </CardHeader>
