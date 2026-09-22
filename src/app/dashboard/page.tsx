@@ -20,9 +20,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScholarshipChart } from "@/components/ScholarshipChart";
-import { sampleScholarships, Scholarship, yearlyApplicationStats, topProviders } from "@/lib/data";
+import { Scholarship, yearlyApplicationStats, topProviders } from "@/lib/data";
 import { useApplicationTracker } from "@/contexts/ApplicationTrackerContext";
 import { useProfile, UserProfile } from "@/contexts/ProfileContext";
+import { useScholarships } from "@/contexts/ScholarshipContext";
 import { useToast } from "@/hooks/use-toast";
 import { daysUntil, cn } from "@/lib/utils";
 import { DeadlineIndicator } from "@/components/DeadlineIndicator";
@@ -84,6 +85,7 @@ function computeRecommendations(user: UserProfile, list: Scholarship[]): ScoredS
 export default function DashboardPage() {
   const { applications, setStatus, getStatus } = useApplicationTracker();
   const { profile, setProfileOpen } = useProfile();
+  const { scholarships, expiredArchive, stats: scholarshipStats, setUpdateModalOpen } = useScholarships();
   const { toast } = useToast();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -100,19 +102,20 @@ export default function DashboardPage() {
     total: Object.keys(applications).length,
   };
 
-  const govtCount = sampleScholarships.filter((s) => s.category === "Government").length;
-  const privateCount = sampleScholarships.filter((s) => s.category === "Private").length;
+  const govtCount = scholarshipStats.govtCount;
+  const privateCount = scholarshipStats.privateCount;
 
   // Recommendations based on user profile
   const recommendedScholarships = useMemo(() => {
-    return computeRecommendations(profile, sampleScholarships).slice(0, 4);
-  }, [profile]);
+    return computeRecommendations(profile, scholarships).slice(0, 4);
+  }, [profile, scholarships]);
 
   // Filtered and sorted scholarships for directory
   const filteredScholarships = useMemo(() => {
-    return sampleScholarships
+    return scholarships
       .filter((s) => {
         // Category filter
+        if (selectedCategory === "new" && !s.isNew) return false;
         if (selectedCategory === "government" && s.category !== "Government") return false;
         if (selectedCategory === "private" && s.category !== "Private") return false;
         if (selectedCategory === "stem" && !s.tags.includes("stem")) return false;
@@ -151,7 +154,7 @@ export default function DashboardPage() {
         }
         return 0;
       });
-  }, [searchQuery, selectedCategory, sortBy]);
+  }, [scholarships, searchQuery, selectedCategory, sortBy]);
 
   const handleApplyRedirect = (scholarship: Scholarship) => {
     const currentStatus = getStatus(scholarship.id);
@@ -238,7 +241,7 @@ export default function DashboardPage() {
             <Sparkles className="h-4 w-4 text-amber-600 dark:text-amber-400" />
           </CardHeader>
           <CardContent className="p-4 pt-0">
-            <div className="text-2xl font-bold text-amber-900 dark:text-amber-100">{sampleScholarships.length} Programs</div>
+            <div className="text-2xl font-bold text-amber-900 dark:text-amber-100">{scholarships.length} Programs</div>
             <p className="text-[11px] text-amber-700/80 dark:text-amber-400">Updated deadlines for 2026–2027</p>
           </CardContent>
         </Card>
@@ -402,8 +405,56 @@ export default function DashboardPage() {
           <div>
             <h2 className="text-2xl font-bold tracking-tight">Complete All-India Scholarships Directory</h2>
             <p className="text-xs text-muted-foreground">
-              Showing {filteredScholarships.length} of {sampleScholarships.length} live government and private scholarships
+              Showing {filteredScholarships.length} of {scholarships.length} live government and private scholarships
             </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setUpdateModalOpen(true)}
+            className="gap-2 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 bg-emerald-50/50 hover:bg-emerald-100/60 self-start md:self-auto"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-emerald-600 animate-pulse" />
+            <span>Lifecycle Center ({scholarshipStats.newlyPublishedCount} New)</span>
+          </Button>
+        </div>
+
+        {/* Dynamic Lifecycle & Replacements Banner */}
+        <div className="p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-900/60 bg-gradient-to-r from-emerald-50/80 via-background to-indigo-50/50 dark:from-emerald-950/20 dark:to-indigo-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600 text-white shrink-0 shadow-xs">
+              <Sparkles className="h-4 w-4" />
+            </span>
+            <div>
+              <span className="font-semibold text-emerald-900 dark:text-emerald-200">
+                Live Scholarship Updates Active:
+              </span>{" "}
+              <span className="text-muted-foreground">
+                Expired scholarships are automatically removed and replaced with active 2026–2027 application cycles.
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              size="sm"
+              variant={selectedCategory === "new" ? "default" : "outline"}
+              onClick={() => setSelectedCategory(selectedCategory === "new" ? "all" : "new")}
+              className={`h-7 text-xs ${
+                selectedCategory === "new"
+                  ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                  : "border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300"
+              }`}
+            >
+              {selectedCategory === "new" ? "Show All Schemes" : `Filter New (${scholarshipStats.newlyPublishedCount})`}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setUpdateModalOpen(true)}
+              className="h-7 text-xs text-primary"
+            >
+              View Audit & Archive ({expiredArchive.length})
+            </Button>
           </div>
         </div>
 
@@ -422,12 +473,13 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2 flex-wrap">
             {/* Category Filter */}
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="w-[170px] bg-background h-9 text-xs">
+              <SelectTrigger className="w-[175px] bg-background h-9 text-xs">
                 <Filter className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Categories ({sampleScholarships.length})</SelectItem>
+                <SelectItem value="all">All Categories ({scholarships.length})</SelectItem>
+                <SelectItem value="new">✨ Newly Published ({scholarshipStats.newlyPublishedCount})</SelectItem>
                 <SelectItem value="government">🏛️ Government ({govtCount})</SelectItem>
                 <SelectItem value="private">🏢 Private / CSR ({privateCount})</SelectItem>
                 <SelectItem value="stem">⚡ STEM & Tech</SelectItem>
@@ -533,12 +585,37 @@ export default function DashboardPage() {
 
                     {/* Title and Provider */}
                     <div>
+                      <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                        {s.isNew && (
+                          <Badge className="bg-emerald-600 text-white text-[10px] font-semibold gap-1 animate-pulse shadow-xs">
+                            <Sparkles className="h-2.5 w-2.5" />
+                            NEW
+                          </Badge>
+                        )}
+                        {s.replacesTitle && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 bg-indigo-50/50 dark:bg-indigo-950/30"
+                            title={`Replaced expired scholarship: ${s.replacesTitle}`}
+                          >
+                            Replaces Expired
+                          </Badge>
+                        )}
+                      </div>
                       <CardTitle className="text-lg font-bold group-hover:text-primary transition-colors leading-snug line-clamp-2">
                         {s.title}
                       </CardTitle>
                       <p className="text-xs font-medium text-muted-foreground mt-1 flex items-center gap-1">
                         {isGovt ? <Landmark className="h-3.5 w-3.5 text-emerald-600" /> : <Building2 className="h-3.5 w-3.5 text-blue-600" />}
                         <span>{s.provider}</span>
+                        {s.publishedAt && (
+                          <>
+                            <span>•</span>
+                            <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-medium">
+                              Published {s.publishedAt}
+                            </span>
+                          </>
+                        )}
                       </p>
                     </div>
 

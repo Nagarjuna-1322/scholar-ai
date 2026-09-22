@@ -3,7 +3,9 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { ProfileProvider } from '@/contexts/ProfileContext';
 import { ApplicationTrackerProvider } from '@/contexts/ApplicationTrackerContext';
+import { ScholarshipProvider } from '@/contexts/ScholarshipContext';
 import { AppLayout } from '@/components/AppLayout';
+import { ScholarshipUpdateModal } from '@/components/ScholarshipUpdateModal';
 
 export const metadata: Metadata = {
   title: 'ScholarAI',
@@ -87,10 +89,13 @@ export default function RootLayout({
       <body className="font-body antialiased" suppressHydrationWarning>
           <ProfileProvider>
             <ApplicationTrackerProvider>
-              <AppLayout>
-                {children}
-              </AppLayout>
-              <Toaster />
+              <ScholarshipProvider>
+                <AppLayout>
+                  {children}
+                </AppLayout>
+                <ScholarshipUpdateModal />
+                <Toaster />
+              </ScholarshipProvider>
             </ApplicationTrackerProvider>
           </ProfileProvider>
       </body>

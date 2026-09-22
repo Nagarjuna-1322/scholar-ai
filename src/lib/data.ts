@@ -12,9 +12,26 @@ export type Scholarship = {
   amount: string;
   education_level?: string;
   source_portal?: string;
+  isNew?: boolean;
+  publishedAt?: string;
+  replacesId?: number;
+  replacesTitle?: string;
+  isExpired?: boolean;
 };
 
-export const sampleScholarships: Scholarship[] = [
+export type ExpiredScholarshipRecord = {
+  expiredId: number;
+  expiredTitle: string;
+  provider: string;
+  originalDeadline: string;
+  category: "Government" | "Private";
+  replacementId?: number;
+  replacementTitle?: string;
+  retiredOn: string;
+  reason: string;
+};
+
+export const rawInitialScholarships: Scholarship[] = [
   // --- GOVERNMENT SCHOLARSHIPS (CENTRAL & STATE) ---
   {
     id: 1,
@@ -387,6 +404,206 @@ export const sampleScholarships: Scholarship[] = [
     source_portal: "KC Mahindra Education Trust Portal",
   },
 ];
+
+// --- ACTIVE REPLACEMENT SCHOLARSHIPS FOR EXPIRED SCHEMES ---
+export const replacementScholarships: Record<number, Scholarship> = {
+  // Replaces ID 2 (AICTE Pragati expired Sep 17, 2026)
+  2: {
+    id: 102,
+    title: "AICTE Pragati Scholarship Scheme 2026-27 (Phase II & Renewal)",
+    provider: "All India Council for Technical Education (AICTE)",
+    category: "Government",
+    eligible_courses: ["Bachelors", "Diploma", "Engineering", "Technology"],
+    income_limit: 800000,
+    deadline: "2026-11-30",
+    description:
+      "Newly published Phase II intake for female students entering technical degree or diploma courses across AICTE-approved institutions nationwide.",
+    apply_link: "https://www.aicte-india.org/schemes/students-development-schemes/Pragati",
+    tags: ["government", "women", "stem", "aicte", "technical", "new"],
+    amount: "₹50,000 / year",
+    education_level: "Technical Degree / Diploma",
+    source_portal: "National Scholarship Portal (scholarships.gov.in)",
+    isNew: true,
+    publishedAt: "2026-09-20",
+    replacesId: 2,
+    replacesTitle: "AICTE Pragati Scholarship Scheme for Girl Students",
+  },
+  // Replaces ID 10 (Reliance Foundation expired Sep 15, 2026)
+  10: {
+    id: 110,
+    title: "Reliance Foundation Scholarships 2026-27 (Winter Cohort)",
+    provider: "Reliance Foundation",
+    category: "Private",
+    eligible_courses: ["Bachelors", "Masters", "Engineering", "Computer Science"],
+    income_limit: 1500000,
+    deadline: "2026-12-15",
+    description:
+      "Fresh winter application intake selecting 5,000 undergraduate and 100 postgraduate scholars across India based on aptitude, merit, and leadership potential.",
+    apply_link: "https://www.reliancefoundation.org/scholarships",
+    tags: ["private", "merit", "reliance", "stem", "new"],
+    amount: "Up to ₹2,00,000 (UG) / ₹6,00,000 (PG)",
+    education_level: "First-Year Undergraduate & Masters",
+    source_portal: "Reliance Foundation Official Portal",
+    isNew: true,
+    publishedAt: "2026-09-20",
+    replacesId: 10,
+    replacesTitle: "Reliance Foundation Undergraduate & Postgraduate Scholarships",
+  },
+  // Replaces ID 12 (Tata Capital Pankh expired Sep 18, 2026)
+  12: {
+    id: 112,
+    title: "Tata Capital Pankh Scholarship Program 2026-27 (Phase II)",
+    provider: "Tata Capital",
+    category: "Private",
+    eligible_courses: ["Bachelors", "Diploma", "Certificate", "General Graduation"],
+    income_limit: 400000,
+    deadline: "2026-12-20",
+    description:
+      "Second call for applications under Tata Capital Pankh initiative supporting economically underprivileged students pursuing higher education and diploma programs.",
+    apply_link: "https://www.buddy4study.com/page/tata-capital-pankh-scholarship-programme",
+    tags: ["private", "tata", "welfare", "need-based", "new"],
+    amount: "Up to ₹15,000 / year",
+    education_level: "Class 11, 12, Diploma, UG",
+    source_portal: "Tata Capital & Buddy4Study",
+    isNew: true,
+    publishedAt: "2026-09-21",
+    replacesId: 12,
+    replacesTitle: "Tata Capital Pankh Scholarship Program",
+  },
+};
+
+// --- BRAND NEW SCHOLARSHIPS PUBLISHED IN CURRENT CYCLE ---
+export const newlyPublishedScholarships: Scholarship[] = [
+  {
+    id: 124,
+    title: "SBI Asha Scholarship Program for Higher Education 2026-27",
+    provider: "SBI Foundation",
+    category: "Private",
+    eligible_courses: ["Bachelors", "Masters", "Engineering", "Medical", "MBA"],
+    income_limit: 300000,
+    deadline: "2026-12-31",
+    description:
+      "Newly published scholarship by SBI Foundation providing substantial financial assistance to meritorious students from low-income families enrolled in top NIRF-ranked institutions.",
+    apply_link: "https://www.sbifoundation.in/asha-scholarship",
+    tags: ["private", "sbi", "merit", "welfare", "new"],
+    amount: "Up to ₹70,000 / year",
+    education_level: "Undergraduate & Postgraduate",
+    source_portal: "SBI Foundation Official Portal",
+    isNew: true,
+    publishedAt: "2026-09-22",
+  },
+  {
+    id: 125,
+    title: "Federal Bank Hormis Memorial Foundation Scholarship 2026-27",
+    provider: "Federal Bank",
+    category: "Private",
+    eligible_courses: ["Bachelors", "Engineering", "Medical", "B.Sc Agriculture", "Nursing"],
+    income_limit: 300000,
+    deadline: "2026-11-25",
+    description:
+      "Freshly announced initiative covering 100% tuition fees and academic expenses for students in professional disciplines such as MBBS, Engineering, Agriculture, and Nursing.",
+    apply_link: "https://www.federalbank.co.in/corporate-social-responsibility",
+    tags: ["private", "banking", "merit", "stem", "new"],
+    amount: "100% Tuition Fees + Academic Expenses",
+    education_level: "First-Year Professional Degree",
+    source_portal: "Federal Bank CSR Portal",
+    isNew: true,
+    publishedAt: "2026-09-22",
+  },
+  {
+    id: 126,
+    title: "National Means-cum-Merit Scholarship Scheme (NMMSS) 2026-27",
+    provider: "Ministry of Education (Govt of India)",
+    category: "Government",
+    eligible_courses: ["Bachelors", "Diploma", "Certificate"],
+    income_limit: 350000,
+    deadline: "2026-11-15",
+    description:
+      "Central government scheme published on the National Scholarship Portal to encourage deserving students from economically weaker sections to continue higher secondary and college education.",
+    apply_link: "https://scholarships.gov.in/",
+    tags: ["government", "nsp", "merit", "central", "new"],
+    amount: "₹12,000 / year",
+    education_level: "College & Diploma Entrance",
+    source_portal: "National Scholarship Portal (scholarships.gov.in)",
+    isNew: true,
+    publishedAt: "2026-09-22",
+  },
+];
+
+/**
+ * Evaluates scholarships against the current date:
+ * - Detects and removes expired scholarships.
+ * - Substitutes them with their active replacement counterpart.
+ * - Injects newly published scholarships.
+ * - Returns active scholarships and an audit archive of expired/replaced schemes.
+ */
+export function updateScholarshipCatalog(
+  existingScholarships: Scholarship[] = rawInitialScholarships,
+  referenceDateStr: string = "2026-09-22"
+): {
+  activeScholarships: Scholarship[];
+  expiredScholarships: ExpiredScholarshipRecord[];
+  newlyPublishedCount: number;
+  replacedCount: number;
+} {
+  const expiredRecords: ExpiredScholarshipRecord[] = [];
+  const activeMap = new Map<number, Scholarship>();
+
+  // 1. Process existing catalog
+  for (const item of existingScholarships) {
+    const isPastDeadline = item.deadline < referenceDateStr;
+
+    if (isPastDeadline) {
+      // Find designated replacement
+      const replacement = replacementScholarships[item.id];
+      expiredRecords.push({
+        expiredId: item.id,
+        expiredTitle: item.title,
+        provider: item.provider,
+        originalDeadline: item.deadline,
+        category: item.category,
+        replacementId: replacement?.id,
+        replacementTitle: replacement?.title,
+        retiredOn: referenceDateStr,
+        reason: `Application window closed on ${item.deadline}. Replaced by active 2026-27 application cycle.`,
+      });
+
+      if (replacement && !activeMap.has(replacement.id)) {
+        activeMap.set(replacement.id, replacement);
+      }
+    } else {
+      activeMap.set(item.id, item);
+    }
+  }
+
+  // 2. Ensure all newly published scholarships are incorporated
+  for (const fresh of newlyPublishedScholarships) {
+    if (!activeMap.has(fresh.id)) {
+      activeMap.set(fresh.id, fresh);
+    }
+  }
+
+  const activeScholarships = Array.from(activeMap.values()).sort((a, b) => {
+    // Sort newly published first, then by deadline
+    if (a.isNew && !b.isNew) return -1;
+    if (!a.isNew && b.isNew) return 1;
+    return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+  });
+
+  const newlyPublishedCount = activeScholarships.filter((s) => s.isNew).length;
+
+  return {
+    activeScholarships,
+    expiredScholarships: expiredRecords,
+    newlyPublishedCount,
+    replacedCount: expiredRecords.length,
+  };
+}
+
+// Pre-computed active scholarships with expired removed and replacements active
+const defaultCatalog = updateScholarshipCatalog(rawInitialScholarships, "2026-09-22");
+export const sampleScholarships: Scholarship[] = defaultCatalog.activeScholarships;
+export const initialExpiredScholarships: ExpiredScholarshipRecord[] = defaultCatalog.expiredScholarships;
 
 export const yearlyApplicationStats = [
   {

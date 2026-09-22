@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Eye, ExternalLink, FileText } from "lucide-react";
+import { Eye, ExternalLink, FileText, Sparkles } from "lucide-react";
 import { ScholarshipStatusTracker, StatusBadge } from "@/components/ScholarshipStatusTracker";
 import { useApplicationTracker } from "@/contexts/ApplicationTrackerContext";
 import { useToast } from "@/hooks/use-toast";
@@ -60,12 +60,37 @@ export function ScholarshipList({
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <CardTitle className="font-headline text-xl">{s.title}</CardTitle>
+                    {s.isNew && (
+                      <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1 text-[11px] font-semibold animate-pulse shadow-xs">
+                        <Sparkles className="h-3 w-3" />
+                        NEW
+                      </Badge>
+                    )}
+                    {s.replacesTitle && (
+                      <Badge
+                        variant="outline"
+                        className="border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 bg-indigo-50/50 dark:bg-indigo-950/30 text-[10px]"
+                        title={`Replaced expired scholarship: ${s.replacesTitle}`}
+                      >
+                        Replaces Expired
+                      </Badge>
+                    )}
                     {daysLeft <= 7 && daysLeft >= 0 && (
                       <DeadlineIndicator deadline={s.deadline} variant="badge" />
                     )}
                     {status && <StatusBadge status={status} />}
                   </div>
-                  <CardDescription>{s.provider}</CardDescription>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 flex-wrap">
+                    <CardDescription className="inline">{s.provider}</CardDescription>
+                    {s.publishedAt && (
+                      <>
+                        <span>•</span>
+                        <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">
+                          Published {s.publishedAt}
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0 flex-wrap">
                   {onGenerateSummary && (

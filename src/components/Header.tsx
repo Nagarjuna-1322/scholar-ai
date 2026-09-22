@@ -2,11 +2,13 @@
 
 import { Button } from "@/components/ui/button";
 import { useProfile } from "@/contexts/ProfileContext";
-import { User, GraduationCap } from "lucide-react";
+import { useScholarships } from "@/contexts/ScholarshipContext";
+import { User, GraduationCap, Sparkles } from "lucide-react";
 import { SidebarTrigger } from "./ui/sidebar";
 
 export function Header() {
   const { setProfileOpen } = useProfile();
+  const { stats, setUpdateModalOpen, hasNewAlert } = useScholarships();
 
   return (
     <header className="flex items-center justify-between mb-8">
@@ -19,11 +21,29 @@ export function Header() {
           </h1>
         </div>
       </div>
-      <div className="flex items-center gap-4">
-        <span className="hidden sm:inline text-sm text-muted-foreground">AI-Powered Scholarship Finder</span>
-        <Button onClick={() => setProfileOpen(true)} variant="outline">
-          <User className="mr-2 h-4 w-4" />
-          Edit Profile
+      <div className="flex items-center gap-2.5 sm:gap-4">
+        <Button
+          onClick={() => setUpdateModalOpen(true)}
+          variant="outline"
+          size="sm"
+          className="relative gap-1.5 border-emerald-300 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100/70"
+          title="View newly published scholarships & replaced expired schemes"
+        >
+          <Sparkles className="h-3.5 w-3.5 text-emerald-600 animate-pulse" />
+          <span className="font-semibold text-xs">
+            Updates ({stats.newlyPublishedCount} New)
+          </span>
+          {hasNewAlert && (
+            <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+            </span>
+          )}
+        </Button>
+
+        <Button onClick={() => setProfileOpen(true)} variant="outline" size="sm">
+          <User className="mr-1.5 h-3.5 w-3.5" />
+          <span>Edit Profile</span>
         </Button>
       </div>
     </header>

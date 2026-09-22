@@ -2,11 +2,12 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useProfile, UserProfile } from "@/contexts/ProfileContext";
-import { Scholarship, sampleScholarships } from "@/lib/data";
+import { useScholarships } from "@/contexts/ScholarshipContext";
+import { Scholarship } from "@/lib/data";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Lightbulb, Eye, ExternalLink } from "lucide-react";
+import { Lightbulb, Eye, ExternalLink, Sparkles } from "lucide-react";
 import { ScholarshipDetail } from "@/components/ScholarshipDetail";
 import { StatusBadge } from "@/components/ScholarshipStatusTracker";
 import { useApplicationTracker } from "@/contexts/ApplicationTrackerContext";
@@ -32,12 +33,13 @@ function recommendScholarships(user: UserProfile, list: Scholarship[]): ScoredSc
 
 export default function RecommendationsPage() {
   const { profile, setProfileOpen } = useProfile();
+  const { scholarships } = useScholarships();
   const { getStatus, setStatus } = useApplicationTracker();
   const { toast } = useToast();
   
   const recommendations = useMemo(() => {
-    return recommendScholarships(profile, sampleScholarships);
-  }, [profile]);
+    return recommendScholarships(profile, scholarships);
+  }, [profile, scholarships]);
   
   const [selectedScholarship, setSelectedScholarship] = useState<Scholarship | null>(null);
   const [isDetailOpen, setDetailOpen] = useState(false);
@@ -103,6 +105,20 @@ export default function RecommendationsPage() {
                                 <div>
                                     <div className="flex items-center gap-2 flex-wrap">
                                       <p className="font-semibold text-base leading-snug">{r.title}</p>
+                                      {r.isNew && (
+                                        <Badge className="bg-emerald-600 text-white text-[10px] font-semibold gap-1 animate-pulse shadow-xs">
+                                          <Sparkles className="h-2.5 w-2.5" />
+                                          NEW
+                                        </Badge>
+                                      )}
+                                      {r.replacesTitle && (
+                                        <Badge
+                                          variant="outline"
+                                          className="text-[10px] border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 bg-indigo-50/50 dark:bg-indigo-950/30"
+                                        >
+                                          Replaces Expired
+                                        </Badge>
+                                      )}
                                       {status && <StatusBadge status={status} />}
                                     </div>
                                     <p className="text-xs text-muted-foreground mt-0.5">{r.provider}</p>

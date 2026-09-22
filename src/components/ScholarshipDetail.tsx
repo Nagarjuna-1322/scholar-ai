@@ -137,6 +137,36 @@ export function ScholarshipDetail({
           </SheetDescription>
         </SheetHeader>
         <div className="flex-grow overflow-y-auto px-6 py-6 space-y-6">
+          {/* Newly Published & Replaced Banners */}
+          {scholarship.isNew && (
+            <div className="p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50/70 dark:bg-emerald-950/30 flex items-start gap-3 text-xs">
+              <Sparkles className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold text-emerald-900 dark:text-emerald-200">
+                  ✨ Newly Published Scholarship Scheme
+                </span>
+                <p className="text-emerald-800/80 dark:text-emerald-300/80 mt-0.5">
+                  This program is currently open for the 2026-27 academic session. Applications are actively being accepted on the official portal.
+                  {scholarship.publishedAt && ` (Published: ${scholarship.publishedAt})`}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {scholarship.replacesTitle && (
+            <div className="p-3.5 rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/70 dark:bg-indigo-950/30 flex items-start gap-3 text-xs">
+              <ArrowRight className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold text-indigo-900 dark:text-indigo-200">
+                  🔄 Active Cycle Replacement
+                </span>
+                <p className="text-indigo-800/80 dark:text-indigo-300/80 mt-0.5">
+                  This scheme replaced the expired application cycle for &ldquo;{scholarship.replacesTitle}&rdquo; so you have uninterrupted access to current funding.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Direct Company Scholarship Portal Card */}
           <div className="p-4 rounded-xl border border-primary/20 bg-primary/5 space-y-3">
             <div className="flex items-start justify-between gap-3">

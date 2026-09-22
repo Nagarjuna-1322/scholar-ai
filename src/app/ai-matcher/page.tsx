@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition, useMemo } from "react";
-import { sampleScholarships, type Scholarship } from "@/lib/data";
+import { type Scholarship } from "@/lib/data";
+import { useScholarships } from "@/contexts/ScholarshipContext";
 import { searchScholarshipsAction } from "@/app/actions";
 import { ScholarshipList } from "@/components/ScholarshipList";
 import { ScholarshipDetail } from "@/components/ScholarshipDetail";
@@ -54,6 +55,7 @@ function scoreScholarshipForUser(user: UserProfile, s: Scholarship): number {
 export default function AIMatcherPage() {
   const { toast } = useToast();
   const { profile, setProfileOpen } = useProfile();
+  const { scholarships: catalogScholarships, stats: scholarshipStats, setUpdateModalOpen } = useScholarships();
 
   const [scholarships, setScholarships] = useState<Scholarship[]>([]);
   const [isSearching, startSearchTransition] = useTransition();
@@ -84,7 +86,7 @@ export default function AIMatcherPage() {
     setHasSearched(true);
     startSearchTransition(async () => {
       try {
-        const result = await searchScholarshipsAction(query, sampleScholarships);
+        const result = await searchScholarshipsAction(query, catalogScholarships);
         if (Array.isArray(result)) {
           setScholarships(result);
         } else {
@@ -108,14 +110,14 @@ export default function AIMatcherPage() {
 
   // Top matches based on current user profile
   const profileMatches = useMemo(() => {
-    return [...sampleScholarships]
+    return [...catalogScholarships]
       .map((s) => ({ ...s, score: scoreScholarshipForUser(profile, s) }))
       .sort((a, b) => b.score - a.score)
       .slice(0, 4);
-  }, [profile]);
+  }, [profile, catalogScholarships]);
 
   const handleQuickSummaryGenerate = () => {
-    const target = sampleScholarships.find((s) => s.id === quickSelectedId);
+    const target = catalogScholarships.find((s) => s.id === quickSelectedId);
     if (target) {
       handleOpenSummary(target);
     } else if (profileMatches.length > 0) {
@@ -190,7 +192,7 @@ export default function AIMatcherPage() {
                 value={quickSelectedId}
                 onValueChange={(val) => {
                   setQuickSelectedId(val);
-                  const target = sampleScholarships.find((s) => s.id === val);
+                  const target = catalogScholarships.find((s) => s.id === val);
                   if (target) handleOpenSummary(target);
                 }}
               >
@@ -198,9 +200,9 @@ export default function AIMatcherPage() {
                   <SelectValue placeholder="Quick Generate PDF for..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {sampleScholarships.map((s) => (
+                  {catalogScholarships.map((s) => (
                     <SelectItem key={s.id} value={s.id} className="text-xs">
-                      {s.title.length > 28 ? `${s.title.slice(0, 28)}...` : s.title}
+                      {s.isNew ? "✨ " : ""}{s.title.length > 28 ? `${s.title.slice(0, 28)}...` : s.title}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -297,6 +299,20 @@ export default function AIMatcherPage() {
                       <div className="flex items-start justify-between gap-2">
                         <div className="space-y-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
+                            {s.isNew && (
+                              <Badge className="bg-emerald-600 text-white text-[10px] font-semibold gap-1 animate-pulse shadow-xs">
+                                <Sparkles className="h-2.5 w-2.5" />
+                                NEW
+                              </Badge>
+                            )}
+                            {s.replacesTitle && (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 bg-indigo-50/50 dark:bg-indigo-950/30"
+                              >
+                                Replaces Expired
+                              </Badge>
+                            )}
                             <Badge
                               variant="secondary"
                               className={
