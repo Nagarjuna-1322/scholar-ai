@@ -24,7 +24,8 @@ import { sampleScholarships, Scholarship, yearlyApplicationStats, topProviders }
 import { useApplicationTracker } from "@/contexts/ApplicationTrackerContext";
 import { useProfile, UserProfile } from "@/contexts/ProfileContext";
 import { useToast } from "@/hooks/use-toast";
-import { daysUntil } from "@/lib/utils";
+import { daysUntil, cn } from "@/lib/utils";
+import { DeadlineIndicator } from "@/components/DeadlineIndicator";
 import { ScholarshipDetail } from "@/components/ScholarshipDetail";
 import { StatusBadge } from "@/components/ScholarshipStatusTracker";
 import { SetReminderButton } from "@/components/SetReminderButton";
@@ -307,9 +308,16 @@ export default function DashboardPage() {
               return (
                 <Card
                   key={`rec-${s.id}`}
-                  className="flex flex-col justify-between hover:shadow-md transition-all border-primary/20 bg-card hover:border-primary/50 relative overflow-hidden"
+                  className={cn(
+                    "flex flex-col justify-between hover:shadow-md transition-all border-primary/20 bg-card hover:border-primary/50 relative overflow-hidden",
+                    daysLeft <= 3 && daysLeft >= 0 && "border-red-500/50 shadow-sm shadow-red-500/10 dark:border-red-600/50",
+                    daysLeft > 3 && daysLeft <= 7 && "border-amber-500/50 shadow-sm shadow-amber-500/10 dark:border-amber-600/50"
+                  )}
                 >
-                  <div className="absolute top-0 right-0 transform translate-x-3 -translate-y-1">
+                  <div className="absolute top-0 right-0 flex items-center gap-1.5 p-2 z-10">
+                    {daysLeft <= 7 && daysLeft >= 0 && (
+                      <DeadlineIndicator deadline={s.deadline} variant="badge" />
+                    )}
                     <Badge className="bg-amber-500 text-white hover:bg-amber-600 text-[10px] px-2 py-0.5 shadow-sm">
                       ★ Top Match ({s.score} pts)
                     </Badge>
@@ -345,14 +353,8 @@ export default function DashboardPage() {
                   </CardHeader>
 
                   <CardContent className="p-4 pt-1 space-y-3">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t">
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span>Deadline:</span>
-                      </span>
-                      <Badge suppressHydrationWarning variant={daysLeft < 30 ? "destructive" : "secondary"} className="text-[10px] px-1.5 py-0">
-                        {s.deadline} ({daysLeft}d)
-                      </Badge>
+                    <div className="pt-1 border-t">
+                      <DeadlineIndicator deadline={s.deadline} variant="compact" />
                     </div>
 
                     {status && (
@@ -499,10 +501,14 @@ export default function DashboardPage() {
               return (
                 <Card
                   key={s.id}
-                  className="flex flex-col justify-between hover:shadow-lg transition-all border-border hover:border-primary/50 group bg-card"
+                  className={cn(
+                    "flex flex-col justify-between hover:shadow-lg transition-all border-border hover:border-primary/50 group bg-card",
+                    daysLeft <= 3 && daysLeft >= 0 && "border-red-500/50 dark:border-red-600/50 shadow-sm shadow-red-500/10",
+                    daysLeft > 3 && daysLeft <= 7 && "border-amber-500/50 dark:border-amber-600/50 shadow-sm shadow-amber-500/10"
+                  )}
                 >
                   <CardHeader className="p-5 pb-3 space-y-2.5">
-                    {/* Top Row: Category + Domain + Set Reminder */}
+                    {/* Top Row: Category + Domain + Deadline Urgency Badge + Set Reminder */}
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <Badge
@@ -518,6 +524,9 @@ export default function DashboardPage() {
                         <Badge variant="outline" className="text-[10px] text-muted-foreground font-mono bg-muted/30">
                           {portalDomain}
                         </Badge>
+                        {daysLeft <= 7 && daysLeft >= 0 && (
+                          <DeadlineIndicator deadline={s.deadline} variant="badge" />
+                        )}
                       </div>
                       <SetReminderButton scholarship={s} size="sm" variant="ghost" />
                     </div>
@@ -562,21 +571,8 @@ export default function DashboardPage() {
                       </span>
                     </div>
 
-                    {/* Deadline & Status */}
-                    <div className="flex items-center justify-between gap-2 text-xs pt-1">
-                      <div className="flex items-center gap-1.5">
-                        <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="text-muted-foreground">Deadline:</span>
-                        <span className="font-semibold text-foreground">{s.deadline}</span>
-                      </div>
-                      <Badge
-                        suppressHydrationWarning
-                        variant={daysLeft < 30 ? "destructive" : "secondary"}
-                        className="text-[10px] px-2 py-0.5 font-semibold"
-                      >
-                        {daysLeft} days left
-                      </Badge>
-                    </div>
+                    {/* Dynamic Color-Coded Deadline & Urgency Progress Bar */}
+                    <DeadlineIndicator deadline={s.deadline} variant="detailed" />
 
                     {status && (
                       <div className="pt-1">

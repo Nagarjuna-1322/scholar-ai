@@ -28,9 +28,12 @@ import {
   ExternalLink,
   Building2,
   Globe,
+  FileText,
+  Download,
 } from "lucide-react";
 import { ScholarshipStatusTracker } from "@/components/ScholarshipStatusTracker";
 import { SetReminderButton } from "@/components/SetReminderButton";
+import { ApplicationSummaryModal } from "@/components/ApplicationSummaryModal";
 
 export function ScholarshipDetail({
   scholarship,
@@ -46,6 +49,7 @@ export function ScholarshipDetail({
   const tracker = useApplicationTracker();
   const [explanation, setExplanation] = useState("");
   const [essay, setEssay] = useState("");
+  const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
   const [isExplanationLoading, startExplanationTransition] = useTransition();
   const [isEssayLoading, startEssayTransition] = useTransition();
 
@@ -235,13 +239,43 @@ export function ScholarshipDetail({
               {isEssayLoading && <Skeleton className="h-24 mt-2" />}
               {essay && <Textarea value={essay} onChange={(e) => setEssay(e.target.value)} rows={8} className="text-sm" />}
             </div>
+
+            <div className="p-4 border rounded-lg bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-200/60 dark:border-indigo-900/40">
+              <div className="flex justify-between items-center gap-3">
+                <div>
+                  <p className="font-medium text-foreground flex items-center gap-1.5">
+                    <FileText className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                    Application Summary PDF
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Generate simplified PDF for your records & document verification
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => setIsSummaryModalOpen(true)}
+                  className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs shrink-0"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span>Generate PDF</span>
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
 
         <SheetFooter className="p-4 sm:p-6 bg-card border-t mt-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Close
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setIsSummaryModalOpen(true)}
+              className="gap-1.5 text-xs text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/40"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              <span>Summary PDF</span>
             </Button>
             <SetReminderButton scholarship={scholarship} variant="outline" />
           </div>
@@ -258,6 +292,12 @@ export function ScholarshipDetail({
             </a>
           </Button>
         </SheetFooter>
+
+        <ApplicationSummaryModal
+          scholarship={scholarship}
+          isOpen={isSummaryModalOpen}
+          onOpenChange={setIsSummaryModalOpen}
+        />
       </SheetContent>
     </Sheet>
   );

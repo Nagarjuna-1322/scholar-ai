@@ -1,7 +1,8 @@
 "use client";
 
 import type { Scholarship } from "@/lib/data";
-import { daysUntil } from "@/lib/utils";
+import { daysUntil, cn } from "@/lib/utils";
+import { DeadlineIndicator } from "@/components/DeadlineIndicator";
 import {
   Card,
   CardContent,
@@ -12,7 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Eye, ExternalLink } from "lucide-react";
+import { Eye, ExternalLink, FileText } from "lucide-react";
 import { ScholarshipStatusTracker, StatusBadge } from "@/components/ScholarshipStatusTracker";
 import { useApplicationTracker } from "@/contexts/ApplicationTrackerContext";
 import { useToast } from "@/hooks/use-toast";
@@ -20,9 +21,11 @@ import { useToast } from "@/hooks/use-toast";
 export function ScholarshipList({
   scholarships = [],
   onSelectScholarship,
+  onGenerateSummary,
 }: {
   scholarships?: Scholarship[];
   onSelectScholarship: (scholarship: Scholarship) => void;
+  onGenerateSummary?: (scholarship: Scholarship) => void;
 }) {
   const safeScholarships = Array.isArray(scholarships) ? scholarships : [];
   const { getStatus, setStatus } = useApplicationTracker();
@@ -41,18 +44,42 @@ export function ScholarshipList({
     <div className="space-y-4">
       {safeScholarships.map((s) => {
         const status = getStatus(s.id);
+        const daysLeft = daysUntil(s.deadline);
+
         return (
-          <Card key={s.id} className="hover:shadow-lg transition-shadow">
+          <Card
+            key={s.id}
+            className={cn(
+              "hover:shadow-lg transition-all",
+              daysLeft <= 3 && daysLeft >= 0 && "border-red-500/50 dark:border-red-600/50 shadow-sm shadow-red-500/10",
+              daysLeft > 3 && daysLeft <= 7 && "border-amber-500/50 dark:border-amber-600/50 shadow-sm shadow-amber-500/10"
+            )}
+          >
             <CardHeader>
               <div className="flex justify-between items-start gap-4">
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <CardTitle className="font-headline text-xl">{s.title}</CardTitle>
+                    {daysLeft <= 7 && daysLeft >= 0 && (
+                      <DeadlineIndicator deadline={s.deadline} variant="badge" />
+                    )}
                     {status && <StatusBadge status={status} />}
                   </div>
                   <CardDescription>{s.provider}</CardDescription>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                  {onGenerateSummary && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onGenerateSummary(s)}
+                      className="gap-1.5 text-xs text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/50 hover:bg-indigo-50 dark:hover:bg-indigo-950/50"
+                      title="Generate simplified Scholarship Application Summary PDF for your records"
+                    >
+                      <FileText className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                      <span>Summary PDF</span>
+                    </Button>
+                  )}
                   <Button size="sm" variant="outline" onClick={() => onSelectScholarship(s)}>
                     <Eye className="mr-1.5 h-3.5 w-3.5"/>
                     View Info
@@ -98,9 +125,8 @@ export function ScholarshipList({
                   <Badge key={tag} variant="outline">{tag}</Badge>
                 ))}
               </div>
-              <div className="flex items-center gap-2 text-muted-foreground shrink-0 ml-4">
-                <Calendar className="h-4 w-4" />
-                <span>{daysUntil(s.deadline)} days left</span>
+              <div className="shrink-0 ml-4">
+                <DeadlineIndicator deadline={s.deadline} variant="compact" />
               </div>
             </CardFooter>
           </Card>

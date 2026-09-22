@@ -11,6 +11,8 @@ import { ScholarshipDetail } from "@/components/ScholarshipDetail";
 import { StatusBadge } from "@/components/ScholarshipStatusTracker";
 import { useApplicationTracker } from "@/contexts/ApplicationTrackerContext";
 import { useToast } from "@/hooks/use-toast";
+import { daysUntil, cn } from "@/lib/utils";
+import { DeadlineIndicator } from "@/components/DeadlineIndicator";
 
 type ScoredScholarship = Scholarship & { score: number };
 
@@ -83,24 +85,63 @@ export default function RecommendationsPage() {
                 <div className="grid md:grid-cols-2 gap-4">
                     {recommendations.map((r) => {
                       const status = getStatus(r.id);
+                      const daysLeft = daysUntil(r.deadline);
+
                       return (
                         <div
                             key={r.id}
-                            className="p-4 border rounded-lg hover:shadow-md hover:border-primary transition-all flex flex-col justify-between"
+                            className={cn(
+                              "p-5 border rounded-xl hover:shadow-md transition-all flex flex-col justify-between bg-card",
+                              daysLeft <= 3 && daysLeft >= 0 && "border-red-500/50 dark:border-red-600/50 shadow-sm shadow-red-500/10",
+                              daysLeft > 3 && daysLeft <= 7 && "border-amber-500/50 dark:border-amber-600/50 shadow-sm shadow-amber-500/10",
+                              daysLeft > 7 && "hover:border-primary/50"
+                            )}
                         >
-                            <div>
+                            <div className="space-y-3">
+                              {/* Top Row: Provider info + Score + Deadline Badge */}
                               <div className="flex justify-between items-start gap-2">
                                 <div>
                                     <div className="flex items-center gap-2 flex-wrap">
-                                      <p className="font-semibold">{r.title}</p>
+                                      <p className="font-semibold text-base leading-snug">{r.title}</p>
                                       {status && <StatusBadge status={status} />}
                                     </div>
-                                    <p className="text-xs text-muted-foreground">{r.provider}</p>
+                                    <p className="text-xs text-muted-foreground mt-0.5">{r.provider}</p>
                                 </div>
-                                <Badge variant="secondary">Score: {r.score}</Badge>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {daysLeft <= 7 && daysLeft >= 0 && (
+                                    <DeadlineIndicator deadline={r.deadline} variant="badge" />
+                                  )}
+                                  <Badge variant="secondary" className="font-medium text-xs">
+                                    ★ Score: {r.score}
+                                  </Badge>
+                                </div>
                               </div>
-                              <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{r.description}</p>
+
+                              {/* Amount & Category */}
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Badge variant="outline" className="font-semibold text-primary border-primary/40 bg-primary/5 text-xs">
+                                  {r.amount}
+                                </Badge>
+                                <Badge
+                                  variant="secondary"
+                                  className={
+                                    r.category === "Government"
+                                      ? "bg-emerald-600/10 text-emerald-700 dark:text-emerald-400 border border-emerald-600/20 text-[11px]"
+                                      : "bg-blue-600/10 text-blue-700 dark:text-blue-400 border border-blue-600/20 text-[11px]"
+                                  }
+                                >
+                                  {r.category === "Government" ? "🏛️ Govt Scheme" : "🏢 Private / CSR"}
+                                </Badge>
+                              </div>
+
+                              <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{r.description}</p>
+
+                              {/* Dynamic Color-Coded Deadline & Urgency Progress Bar */}
+                              <div className="pt-1">
+                                <DeadlineIndicator deadline={r.deadline} variant="detailed" />
+                              </div>
                             </div>
+
                             <div className="mt-4 pt-3 border-t flex items-center justify-between gap-2 flex-wrap">
                               <Button size="sm" variant="outline" onClick={() => handleSelectScholarship(r)}>
                                 <Eye className="mr-1.5 h-4 w-4"/> View Details

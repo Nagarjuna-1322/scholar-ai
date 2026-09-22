@@ -39,7 +39,7 @@ export const sampleScholarships: Scholarship[] = [
     category: "Government",
     eligible_courses: ["Bachelors", "Diploma", "Engineering", "Technology"],
     income_limit: 800000,
-    deadline: "2026-11-15",
+    deadline: "2026-09-17",
     description:
       "Flagship government scheme giving financial aid of ₹50,000 per annum to young women taking admission in technical degree or diploma courses across AICTE-approved institutions.",
     apply_link: "https://www.aicte-india.org/schemes/students-development-schemes/Pragati",
@@ -71,7 +71,7 @@ export const sampleScholarships: Scholarship[] = [
     category: "Government",
     eligible_courses: ["Bachelors", "Masters", "PhD", "Diploma", "Certificate"],
     income_limit: 200000,
-    deadline: "2026-11-30",
+    deadline: "2026-09-28",
     description:
       "Central government financial aid covering full course fee and monthly maintenance allowance for minority community students (Muslim, Christian, Sikh, Buddhist, Jain, Parsi).",
     apply_link: "https://scholarships.gov.in/",
@@ -169,7 +169,7 @@ export const sampleScholarships: Scholarship[] = [
     category: "Private",
     eligible_courses: ["Bachelors", "Masters", "Engineering", "Computer Science"],
     income_limit: 1500000,
-    deadline: "2026-10-15",
+    deadline: "2026-09-15",
     description:
       "One of India's largest private scholarship initiatives, selecting 5,000 undergraduate and 100 postgraduate scholars in any stream based on aptitude, merit, and leadership potential.",
     apply_link: "https://www.reliancefoundation.org/scholarships",
@@ -201,7 +201,7 @@ export const sampleScholarships: Scholarship[] = [
     category: "Private",
     eligible_courses: ["Bachelors", "Diploma", "Certificate", "General Graduation"],
     income_limit: 400000,
-    deadline: "2026-11-30",
+    deadline: "2026-09-18",
     description:
       "Tata Capital's flagship CSR initiative hosted on Buddy4Study offering financial support up to ₹12,000 per year to economically underprivileged students across India.",
     apply_link: "https://www.buddy4study.com/page/tata-capital-pankh-scholarship-programme",
