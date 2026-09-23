@@ -32,7 +32,7 @@ import {
 import { useScholarships } from "@/contexts/ScholarshipContext";
 import { daysUntil } from "@/lib/utils";
 import { DeadlineIndicator } from "@/components/DeadlineIndicator";
-import { generateScholarshipSummaryPdf } from "@/lib/pdf-generator";
+import { generateScholarshipSummaryPdf } from "@/lib/pdfGenerator";
 import { useProfile } from "@/contexts/ProfileContext";
 import { useToast } from "@/hooks/use-toast";
 import type { Scholarship } from "@/lib/data";

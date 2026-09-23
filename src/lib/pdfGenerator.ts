@@ -385,3 +385,23 @@ export function downloadApplicationSummaryPdf(options: SummaryPdfOptions): void 
   const fileName = `Scholarship_Summary_${safeName}_${applicantName}.pdf`;
   doc.save(fileName);
 }
+
+/**
+ * Convenience helper accepting (scholarship, profile) for direct calls
+ */
+export function generateScholarshipSummaryPdf(scholarship: Scholarship, profile?: Partial<UserProfile>): void {
+  downloadApplicationSummaryPdf({
+    scholarship,
+    profile: {
+      name: profile?.name || "Student Applicant",
+      category: profile?.category || "General",
+      gender: profile?.gender || "All",
+      course: profile?.course || "Undergraduate",
+      income: profile?.income ?? 500000,
+      state: profile?.state || "India",
+      tenthPercentage: profile?.tenthPercentage ?? 85,
+      twelfthPercentage: profile?.twelfthPercentage ?? 85,
+    },
+  });
+}
+
