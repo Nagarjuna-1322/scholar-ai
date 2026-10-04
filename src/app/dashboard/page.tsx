@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -93,6 +93,35 @@ export default function DashboardPage() {
   const [sortBy, setSortBy] = useState<string>("deadline");
   const [selectedScholarship, setSelectedScholarship] = useState<Scholarship | null>(null);
   const [isDetailOpen, setDetailOpen] = useState(false);
+
+  // Sync search queries from top header search bar or URL params
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const q = params.get("search") || params.get("q");
+      if (q) {
+        setSearchQuery(q);
+        setTimeout(() => {
+          const el = document.getElementById("scholarships-directory");
+          if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 150);
+      }
+    }
+
+    const handleSearchEvent = (e: CustomEvent<{ query: string }>) => {
+      if (e.detail?.query !== undefined) {
+        setSearchQuery(e.detail.query);
+        setTimeout(() => {
+          const el = document.getElementById("scholarships-directory");
+          if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 150);
+      }
+    };
+    window.addEventListener("scholarship-search-query" as any, handleSearchEvent);
+    return () => {
+      window.removeEventListener("scholarship-search-query" as any, handleSearchEvent);
+    };
+  }, []);
 
   // Application pipeline stats
   const appStats = {
@@ -400,7 +429,7 @@ export default function DashboardPage() {
       </div>
 
       {/* SECTION 2: 🏛️ / 🏢 COMPLETE ALL-INDIA SCHOLARSHIPS DIRECTORY */}
-      <div className="space-y-4 pt-4 border-t">
+      <div id="scholarships-directory" className="space-y-4 pt-4 border-t">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
             <h2 className="text-2xl font-bold tracking-tight">Complete All-India Scholarships Directory</h2>
