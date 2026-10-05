@@ -6,6 +6,7 @@ import { ApplicationTrackerProvider } from '@/contexts/ApplicationTrackerContext
 import { ScholarshipProvider } from '@/contexts/ScholarshipContext';
 import { AppLayout } from '@/components/AppLayout';
 import { ScholarshipUpdateModal } from '@/components/ScholarshipUpdateModal';
+import { Analytics } from '@vercel/analytics/next';
 
 export const metadata: Metadata = {
   title: 'ScholarAI',
@@ -98,6 +99,7 @@ export default function RootLayout({
               </ScholarshipProvider>
             </ApplicationTrackerProvider>
           </ProfileProvider>
+          <Analytics />
       </body>
     </html>
   );
