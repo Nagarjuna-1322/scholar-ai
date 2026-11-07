@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition, useMemo } from "react";
+import React, { useState, useTransition, useMemo } from "react";
 import { type Scholarship } from "@/lib/data";
+import { evaluateAndRankScholarships } from "@/lib/eligibilityEngine";
 import { useScholarships } from "@/contexts/ScholarshipContext";
 import { searchScholarshipsAction } from "@/app/actions";
 import { ScholarshipList } from "@/components/ScholarshipList";
@@ -10,10 +11,20 @@ import { ApplicationSummaryModal } from "@/components/ApplicationSummaryModal";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AIMatcher } from "@/components/AIMatcher";
-import { useProfile, UserProfile } from "@/contexts/ProfileContext";
+import { useProfile } from "@/contexts/ProfileContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -25,52 +36,216 @@ import {
   FileText,
   Download,
   Sparkles,
-  User,
-  GraduationCap,
-  ShieldCheck,
-  Building2,
   Calendar,
   CheckCircle2,
+  AlertTriangle,
+  XCircle,
   Eye,
-  ExternalLink,
+  Upload,
+  FileSearch,
+  ShieldCheck,
+  Loader2,
+  CheckSquare,
+  Square,
 } from "lucide-react";
-import { daysUntil } from "@/lib/utils";
-import { DeadlineIndicator } from "@/components/DeadlineIndicator";
 
-function scoreScholarshipForUser(user: UserProfile, s: Scholarship): number {
-  let score = 0;
-  const userCourseLower = (user.course || "").toLowerCase();
-  const matchesCourse = s.eligible_courses.some(
-    (c) => userCourseLower.includes(c.toLowerCase()) || c.toLowerCase().includes(userCourseLower)
-  );
-  if (matchesCourse) score += 5;
-  if (user.income <= s.income_limit) score += 4;
-  if (user.marks_percent >= 80 && s.tags.includes("merit")) score += 3;
-  if (s.tags.includes("stem") && (userCourseLower.includes("tech") || userCourseLower.includes("engineer") || userCourseLower.includes("bachelor"))) {
-    score += 3;
-  }
-  return score;
+const MASTER_DOCUMENTS = [
+  "Class 10 & Class 12 Mark Sheets",
+  "Previous Academic Mark Sheet / Latest Semester GPA Card",
+  "Valid Family Income Certificate (Tehsildar / MeeSeva / MahaOnline)",
+  "Bonafide / Current Admission Certificate from Institution",
+  "Caste / Category / EWS Certificate (if applicable)",
+  "Domicile / Residence Certificate",
+  "Student Bank Account Passbook Copy (NPCI / DBT Linked)",
+  "College Tuition Fee Receipt / Fee Structure",
+  "Disability / PwD Certificate (if applicable for Saksham)",
+];
+
+interface ExtractedData {
+  fullName: string | null;
+  course: string | null;
+  specialization: string | null;
+  education_level: string | null;
+  academic_year: string | null;
+  institution: string | null;
+  marks_percent: number | null;
+  cgpa: number | null;
+  income: number | null;
+  category: string | null;
+  state: string | null;
+  achievements: string[];
+  detectedDocumentType: string;
+  readinessNotes: string[];
 }
 
 export default function AIMatcherPage() {
   const { toast } = useToast();
-  const { profile, setProfileOpen } = useProfile();
-  const { scholarships: catalogScholarships, stats: scholarshipStats, setUpdateModalOpen } = useScholarships();
+  const { profile, updateProfile, setProfileOpen } = useProfile();
+  const { scholarships: catalogScholarships } = useScholarships();
+
+  // Document & Resume Upload state integrated into Check My Eligibility
+  const [documentType, setDocumentType] = useState("Resume / CV");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [pastedText, setPastedText] = useState("");
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [extracted, setExtracted] = useState<ExtractedData | null>(null);
+  const [showChecklist, setShowChecklist] = useState(false);
 
   const [scholarships, setScholarships] = useState<Scholarship[]>([]);
   const [isSearching, startSearchTransition] = useTransition();
   const [hasSearched, setHasSearched] = useState(false);
 
-  // Detail Modal State
   const [selectedScholarship, setSelectedScholarship] = useState<Scholarship | null>(null);
   const [isDetailOpen, setDetailOpen] = useState(false);
 
-  // PDF Summary Modal State
   const [summaryScholarship, setSummaryScholarship] = useState<Scholarship | null>(null);
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
 
-  // Quick picker state
   const [quickSelectedId, setQuickSelectedId] = useState<string>("");
+  const [activeStatusTab, setActiveStatusTab] = useState<"All" | "Eligible" | "Possibly Eligible" | "Not Eligible">("All");
+
+  const completedDocs = new Set(profile.completed_documents || []);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFileError(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = [
+      "application/pdf",
+      "text/plain",
+      "image/png",
+      "image/jpeg",
+      "image/webp",
+    ];
+    if (!allowedTypes.includes(file.type)) {
+      setFileError("Unsupported file type. Please upload a PDF, TXT, PNG, or JPEG file.");
+      setSelectedFile(null);
+      return;
+    }
+
+    const maxBytes = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxBytes) {
+      setFileError("File exceeds 5MB limit. Scholarship portals require files under 5MB.");
+      setSelectedFile(null);
+      return;
+    }
+
+    setSelectedFile(file);
+    if (file.type === "text/plain") {
+      file.text().then((txt) => setPastedText(txt)).catch(() => {});
+    }
+  };
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = String(reader.result || "");
+        const base64 = result.includes(",") ? result.split(",")[1] : result;
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleAnalyzeDocument = async () => {
+    if (!selectedFile && !pastedText.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Document or Text Required",
+        description: "Upload a PDF/Image/TXT file (≤5MB) or paste your resume/mark sheet text to check eligibility.",
+      });
+      return;
+    }
+
+    setIsAnalyzing(true);
+    try {
+      let base64Data = "";
+      if (selectedFile && selectedFile.type !== "text/plain") {
+        base64Data = await fileToBase64(selectedFile);
+      }
+
+      const res = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "analyze_document",
+          fileName: selectedFile?.name || "Pasted_Resume.txt",
+          mimeType: selectedFile?.type || "text/plain",
+          base64Data,
+          extractedText: pastedText,
+          documentType,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.ok && data.extracted) {
+        setExtracted(data.extracted);
+        toast({
+          title: "Document Verified",
+          description: "Review your extracted details and click 'Apply & Check Eligibility' to update your matches.",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Analysis Failed",
+          description: data.error || "Could not parse document.",
+        });
+      }
+    } catch {
+      toast({
+        variant: "destructive",
+        title: "Network Error",
+        description: "Unable to analyze document right now.",
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleApplyToProfile = () => {
+    if (!extracted) return;
+    const patch: Record<string, unknown> = {};
+    if (extracted.fullName) {
+      patch.name = extracted.fullName;
+      patch.fullName = extracted.fullName;
+    }
+    if (extracted.course) patch.course = extracted.course;
+    if (extracted.specialization) patch.specialization = extracted.specialization;
+    if (extracted.education_level) patch.education_level = extracted.education_level;
+    if (extracted.academic_year) patch.academic_year = extracted.academic_year;
+    if (extracted.institution) patch.institution = extracted.institution;
+    if (extracted.marks_percent !== null && extracted.marks_percent !== undefined) {
+      patch.marks_percent = Number(extracted.marks_percent);
+    }
+    if (extracted.cgpa !== null && extracted.cgpa !== undefined) {
+      patch.cgpa = Number(extracted.cgpa);
+    }
+    if (extracted.income !== null && extracted.income !== undefined) {
+      patch.income = Number(extracted.income);
+    }
+    if (extracted.category) patch.category = extracted.category;
+    if (extracted.state) patch.state = extracted.state;
+    if (extracted.achievements?.length) {
+      patch.career_interests = extracted.achievements.slice(0, 2).join("; ");
+    }
+
+    updateProfile(patch);
+    toast({
+      title: "Eligibility Updated from Document",
+      description: "Your scholarship matches below have been refreshed with your verified document details!",
+    });
+  };
+
+  const toggleDocChecklist = (docName: string) => {
+    const current = profile.completed_documents || [];
+    const exists = current.includes(docName);
+    const updated = exists ? current.filter((d) => d !== docName) : [...current, docName];
+    updateProfile({ completed_documents: updated });
+  };
 
   const handleSelectScholarship = (scholarship: Scholarship) => {
     setSelectedScholarship(scholarship);
@@ -87,12 +262,8 @@ export default function AIMatcherPage() {
     startSearchTransition(async () => {
       try {
         const result = await searchScholarshipsAction(query, catalogScholarships);
-        if (Array.isArray(result)) {
-          setScholarships(result);
-        } else {
-          setScholarships([]);
-        }
-      } catch (err) {
+        setScholarships(Array.isArray(result) ? result : []);
+      } catch {
         toast({
           variant: "destructive",
           title: "Search Error",
@@ -108,20 +279,31 @@ export default function AIMatcherPage() {
     setHasSearched(false);
   };
 
-  // Top matches based on current user profile
-  const profileMatches = useMemo(() => {
-    return [...catalogScholarships]
-      .map((s) => ({ ...s, score: scoreScholarshipForUser(profile, s) }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 4);
+  // Shared Deterministic Eligibility Engine across all catalog items
+  const evaluatedAll = useMemo(() => {
+    return evaluateAndRankScholarships(profile, catalogScholarships);
   }, [profile, catalogScholarships]);
 
+  const filteredEvaluations = useMemo(() => {
+    if (activeStatusTab === "All") return evaluatedAll;
+    return evaluatedAll.filter((x) => x.evaluation.status === activeStatusTab);
+  }, [evaluatedAll, activeStatusTab]);
+
+  const counts = useMemo(() => {
+    return {
+      All: evaluatedAll.length,
+      Eligible: evaluatedAll.filter((x) => x.evaluation.status === "Eligible").length,
+      "Possibly Eligible": evaluatedAll.filter((x) => x.evaluation.status === "Possibly Eligible").length,
+      "Not Eligible": evaluatedAll.filter((x) => x.evaluation.status === "Not Eligible").length,
+    };
+  }, [evaluatedAll]);
+
   const handleQuickSummaryGenerate = () => {
-    const target = catalogScholarships.find((s) => s.id === quickSelectedId);
+    const target = catalogScholarships.find((s) => String(s.id) === quickSelectedId);
     if (target) {
       handleOpenSummary(target);
-    } else if (profileMatches.length > 0) {
-      handleOpenSummary(profileMatches[0]);
+    } else if (evaluatedAll.length > 0) {
+      handleOpenSummary(evaluatedAll[0].scholarship);
     }
   };
 
@@ -130,79 +312,342 @@ export default function AIMatcherPage() {
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <h1 className="text-3xl font-bold tracking-tight">AI Scholarship Matcher</h1>
-            <Badge className="bg-indigo-600/10 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900 text-xs font-semibold">
-              PDF Records Active
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-2xl sm:text-3xl font-bold font-headline tracking-tight">
+              Check My Eligibility
+            </h1>
+            <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-semibold">
+              <ShieldCheck className="h-3.5 w-3.5 mr-1" />
+              Resume & Document Verification
             </Badge>
           </div>
-          <p className="text-muted-foreground text-sm">
-            Use natural language to find scholarships, evaluate fit, and generate simplified Application Summary PDFs for your records.
+          <p className="text-muted-foreground text-xs sm:text-sm">
+            Upload your resume, mark sheet, or income certificate to verify your details and check which scholarships you are <strong>Eligible</strong> for.
           </p>
         </div>
 
-        {/* User Profile Snapshot Badge */}
-        <div className="flex items-center gap-2 bg-card border rounded-lg p-2.5 px-3 shadow-xs text-xs">
-          <div className="h-7 w-7 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold shrink-0">
-            {profile.name ? profile.name.charAt(0).toUpperCase() : "U"}
-          </div>
-          <div className="truncate max-w-[180px]">
-            <p className="font-semibold text-foreground truncate">{profile.name || "Student Applicant"}</p>
+        <div className="flex items-center gap-2 bg-card border rounded-lg p-2.5 px-3 shadow-2xs text-xs">
+          <div className="truncate max-w-[220px]">
+            <p className="font-semibold text-foreground truncate">{profile.name || "Student"}</p>
             <p className="text-muted-foreground text-[11px] truncate">
-              {profile.course || "General"} • ₹{(profile.income / 100000).toFixed(1)}L/yr
+              {profile.course} • {profile.marks_percent}% • ₹{((profile.income ?? 0) / 100000).toFixed(1)}L • {profile.state}
             </p>
           </div>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setProfileOpen(true)}
-            className="text-[11px] h-7 px-2 text-primary hover:text-primary/90"
+            className="text-[11px] h-7 px-2 text-primary"
           >
-            Edit
+            Edit Profile
           </Button>
         </div>
       </div>
 
-      {/* Feature Banner: Scholarship Application Summary PDF */}
-      <Card className="border-indigo-200 dark:border-indigo-900/60 bg-gradient-to-r from-indigo-50/70 via-card to-purple-50/30 dark:from-indigo-950/20 dark:via-card dark:to-purple-950/10 shadow-xs">
-        <CardHeader className="p-5 pb-3">
+      {/* INTEGRATED UPLOAD RESUME / DOCUMENTS TO CHECK ELIGIBILITY */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="border-primary/20">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-bold flex items-center gap-2">
+              <Upload className="h-4 w-4 text-primary" />
+              Upload Resume or Academic Document
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Upload your Resume, Mark Sheet, or Income Certificate (PDF, PNG, JPG, TXT ≤ 5MB) to check reliability and auto-fill your eligibility profile.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3.5 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Document Type</Label>
+                <select
+                  value={documentType}
+                  onChange={(e) => setDocumentType(e.target.value)}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-xs"
+                >
+                  <option value="Resume / CV">Student Resume / CV</option>
+                  <option value="Academic Mark Sheet">Class 10 / 12 / Semester Mark Sheet</option>
+                  <option value="Income Certificate">Family Income Certificate</option>
+                  <option value="Category / Domicile Certificate">Caste / EWS / Domicile Certificate</option>
+                  <option value="Bonafide Certificate">College Bonafide / Fee Structure</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs">Choose File (PDF, PNG, JPG, TXT ≤ 5MB)</Label>
+                <Input
+                  type="file"
+                  accept=".pdf,.txt,.png,.jpg,.jpeg,.webp"
+                  onChange={handleFileChange}
+                  className="h-9 text-xs cursor-pointer"
+                />
+              </div>
+            </div>
+
+            {fileError && (
+              <div className="p-2.5 rounded-lg border border-rose-300 bg-rose-50 text-rose-800 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span>{fileError}</span>
+              </div>
+            )}
+
+            {selectedFile && !fileError && (
+              <div className="p-2.5 rounded-lg border border-emerald-200 bg-emerald-50/60 dark:bg-emerald-950/30 flex items-center justify-between">
+                <span className="font-medium text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
+                  <FileText className="h-4 w-4 text-emerald-600" />
+                  {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
+                </span>
+                <Badge className="bg-emerald-600 text-white text-[10px]">Verified ≤5MB</Badge>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Or Paste Resume / Mark Sheet Details</Label>
+              <Textarea
+                value={pastedText}
+                onChange={(e) => setPastedText(e.target.value)}
+                placeholder="Example: Nagarjuna Reddy, B.Tech Computer Science (2nd Year) at JNTU Hyderabad, Telangana. Class 12 Marks: 91.4%, CGPA: 8.7. Annual Family Income: Rs. 1,80,000. Category: General..."
+                rows={3}
+                className="text-xs"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                onClick={handleAnalyzeDocument}
+                disabled={isAnalyzing}
+                className="gap-1.5 text-xs"
+              >
+                {isAnalyzing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                <span>Verify Document & Check Eligibility</span>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setPastedText(
+                    "Nagarjuna Reddy | B.Tech in Computer Science & Engineering (2nd Year), JNTU Hyderabad, Telangana | Class 12 Percentage: 88.5% | Current CGPA: 8.6 | Annual Family Income: ₹220000 | Category: General | Achievements: Smart India Hackathon Finalist"
+                  )
+                }
+                className="text-xs"
+              >
+                Try Sample Resume
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowChecklist((prev) => !prev)}
+                className="text-xs ml-auto"
+              >
+                {showChecklist ? "Hide Document Checklist" : `Document Checklist (${completedDocs.size}/${MASTER_DOCUMENTS.length})`}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Extracted Details & Instant Eligibility Confirmation */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-bold flex items-center gap-2">
+              <FileSearch className="h-4 w-4 text-indigo-600" />
+              Verified Details from Your Document
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Confirm or edit your extracted details below to immediately recalculate your scholarship eligibility.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-xs">
+            {!extracted ? (
+              <div className="py-10 px-4 text-center text-muted-foreground border border-dashed rounded-lg space-y-2">
+                <p className="font-medium text-foreground">No document analyzed yet</p>
+                <p>
+                  Upload your resume, mark sheet, or certificate on the left (or click <strong>Try Sample Resume</strong>) to verify your academic and income reliability.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="space-y-1">
+                    <Label className="text-[11px]">Course / Degree</Label>
+                    <Input
+                      value={extracted.course || ""}
+                      onChange={(e) => setExtracted({ ...extracted, course: e.target.value })}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px]">Specialization</Label>
+                    <Input
+                      value={extracted.specialization || ""}
+                      onChange={(e) => setExtracted({ ...extracted, specialization: e.target.value })}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px]">Marks (%)</Label>
+                    <Input
+                      type="number"
+                      value={extracted.marks_percent ?? ""}
+                      onChange={(e) =>
+                        setExtracted({
+                          ...extracted,
+                          marks_percent: e.target.value ? Number(e.target.value) : null,
+                        })
+                      }
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px]">CGPA</Label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      value={extracted.cgpa ?? ""}
+                      onChange={(e) =>
+                        setExtracted({
+                          ...extracted,
+                          cgpa: e.target.value ? Number(e.target.value) : null,
+                        })
+                      }
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px]">Annual Family Income (₹)</Label>
+                    <Input
+                      type="number"
+                      value={extracted.income ?? ""}
+                      onChange={(e) =>
+                        setExtracted({
+                          ...extracted,
+                          income: e.target.value ? Number(e.target.value) : null,
+                        })
+                      }
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px]">State / Domicile</Label>
+                    <Input
+                      value={extracted.state || ""}
+                      onChange={(e) => setExtracted({ ...extracted, state: e.target.value })}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                </div>
+
+                {extracted.achievements && extracted.achievements.length > 0 && (
+                  <div className="p-2.5 rounded-lg border bg-muted/40 space-y-1">
+                    <p className="font-semibold">Detected Achievements & Reliability Notes:</p>
+                    <ul className="list-disc pl-4 space-y-0.5 text-muted-foreground">
+                      {extracted.achievements.map((ach, i) => (
+                        <li key={i}>{ach}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+          {extracted && (
+            <CardFooter className="border-t pt-3 flex justify-end">
+              <Button size="sm" onClick={handleApplyToProfile} className="gap-1.5 text-xs">
+                <CheckCircle2 className="h-4 w-4" />
+                Apply & Check My Eligibility Now
+              </Button>
+            </CardFooter>
+          )}
+        </Card>
+      </div>
+
+      {/* Collapsible Document Readiness Checklist */}
+      {showChecklist && (
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <CardTitle className="text-base font-bold">
+                  Scholarship Document Readiness Checklist
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Check off the documents you have ready. Your selections update your readiness across all {catalogScholarships.length} scholarships.
+                </CardDescription>
+              </div>
+              <Badge variant="secondary" className="font-mono text-xs self-start">
+                {completedDocs.size} / {MASTER_DOCUMENTS.length} Ready
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {MASTER_DOCUMENTS.map((docName) => {
+                const isDone = completedDocs.has(docName);
+                return (
+                  <button
+                    key={docName}
+                    type="button"
+                    onClick={() => toggleDocChecklist(docName)}
+                    className={`flex items-start gap-2.5 p-3 rounded-lg border text-xs text-left transition-all ${
+                      isDone
+                        ? "border-emerald-300 bg-emerald-50/70 text-emerald-950 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
+                        : "border-border hover:bg-muted/60 text-muted-foreground"
+                    }`}
+                  >
+                    {isDone ? (
+                      <CheckSquare className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <Square className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                    )}
+                    <span className="font-medium leading-snug">{docName}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* PDF Summary Dossier Generator Card */}
+      <Card className="border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/40 dark:bg-indigo-950/20">
+        <CardHeader className="p-4 sm:p-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-start gap-3">
-              <div className="p-2.5 rounded-xl bg-indigo-600 text-white shadow-sm shrink-0 mt-0.5">
-                <FileText className="h-5 w-5" />
+              <div className="p-2 rounded-lg bg-indigo-600 text-white shrink-0 mt-0.5">
+                <FileText className="h-4 w-4" />
               </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <CardTitle className="text-lg font-bold text-foreground">
-                    Scholarship Application Summary (PDF Record Dossier)
-                  </CardTitle>
-                  <Badge variant="outline" className="border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-400 bg-white/60 dark:bg-black/20 text-[10px]">
-                    Offline Tracking
-                  </Badge>
-                </div>
-                <CardDescription className="text-xs text-muted-foreground max-w-2xl leading-relaxed">
-                  Generate an official, simplified 1-page PDF summary for your selected scholarship containing your student profile snapshot, eligibility check, scholarship metadata, and essential document verification checklist.
+              <div className="space-y-0.5">
+                <CardTitle className="text-sm sm:text-base font-bold text-foreground">
+                  Download Eligibility & Document Readiness PDF
+                </CardTitle>
+                <CardDescription className="text-xs text-muted-foreground">
+                  Export a 1-page printable A4 PDF with your profile snapshot, eligibility status, and mandatory document checklist.
                 </CardDescription>
               </div>
             </div>
 
-            {/* Quick Generator Selector */}
-            <div className="flex items-center gap-2 shrink-0 sm:self-center">
+            <div className="flex items-center gap-2 shrink-0">
               <Select
                 value={quickSelectedId}
                 onValueChange={(val) => {
                   setQuickSelectedId(val);
-                  const target = catalogScholarships.find((s) => s.id === val);
+                  const target = catalogScholarships.find((s) => String(s.id) === val);
                   if (target) handleOpenSummary(target);
                 }}
               >
-                <SelectTrigger className="w-[220px] text-xs h-9 bg-background">
-                  <SelectValue placeholder="Quick Generate PDF for..." />
+                <SelectTrigger className="w-[210px] text-xs h-8 bg-background">
+                  <SelectValue placeholder="Select scholarship..." />
                 </SelectTrigger>
                 <SelectContent>
                   {catalogScholarships.map((s) => (
-                    <SelectItem key={s.id} value={s.id} className="text-xs">
-                      {s.isNew ? "✨ " : ""}{s.title.length > 28 ? `${s.title.slice(0, 28)}...` : s.title}
+                    <SelectItem key={s.id} value={String(s.id)} className="text-xs">
+                      {s.title.length > 30 ? `${s.title.slice(0, 30)}...` : s.title}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -211,55 +656,34 @@ export default function AIMatcherPage() {
               <Button
                 size="sm"
                 onClick={handleQuickSummaryGenerate}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white h-9 px-3 gap-1.5 text-xs font-semibold shadow-xs"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white h-8 px-3 gap-1.5 text-xs"
               >
                 <Download className="h-3.5 w-3.5" />
-                <span>Create PDF</span>
+                <span>Export PDF</span>
               </Button>
             </div>
           </div>
         </CardHeader>
       </Card>
 
-      {/* AI Matcher Search Bar */}
-      <div className="space-y-3">
+      {/* Natural Language Search Bar */}
+      <div className="space-y-2">
         <AIMatcher isSearching={isSearching} onSearch={handleSearch} onClear={handleClear} />
-        <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
-          <span className="flex items-center gap-1.5">
-            <Sparkles className="h-3.5 w-3.5 text-accent" />
-            Try: &ldquo;scholarships for computer science students under 5 lakhs income&rdquo; or &ldquo;women engineering grants&rdquo;
-          </span>
-          {hasSearched && (
-            <span className="font-medium text-foreground">
-              {scholarships.length} {scholarships.length === 1 ? "result" : "results"} found
-            </span>
-          )}
-        </div>
       </div>
 
-      {/* Main Content Area */}
       {isSearching ? (
         <div className="space-y-4">
-          <Skeleton className="h-36 w-full rounded-xl" />
           <Skeleton className="h-36 w-full rounded-xl" />
           <Skeleton className="h-36 w-full rounded-xl" />
         </div>
       ) : hasSearched ? (
         <div className="space-y-4">
           <div className="flex items-center justify-between bg-muted/40 p-3 px-4 rounded-lg border text-xs">
-            <span className="text-muted-foreground">
-              Click <strong className="text-indigo-600 dark:text-indigo-400">Summary PDF</strong> on any card to export a tailored application dossier for your records.
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleClear}
-              className="text-xs h-7 px-2"
-            >
+            <span>Found {scholarships.length} matching scholarships</span>
+            <Button variant="ghost" size="sm" onClick={handleClear} className="text-xs h-7">
               Reset Search
             </Button>
           </div>
-
           <ScholarshipList
             scholarships={scholarships}
             onSelectScholarship={handleSelectScholarship}
@@ -267,147 +691,142 @@ export default function AIMatcherPage() {
           />
         </div>
       ) : (
-        <div className="space-y-6">
-          {/* Profile-Matched Scholarships Grid */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-base text-foreground flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-amber-500" />
-                  Top Matched Scholarships for Your Profile
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Pre-screened against your course ({profile.course}) and annual family income (₹{profile.income.toLocaleString("en-IN")}).
-                </p>
-              </div>
-              <Badge variant="secondary" className="text-xs">
-                {profileMatches.length} Matches Ready
-              </Badge>
+        <div className="space-y-4">
+          {/* Three Explicit Eligibility State Tabs */}
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="inline-flex p-1 bg-muted rounded-lg text-xs font-medium flex-wrap gap-1">
+              {(["All", "Eligible", "Possibly Eligible", "Not Eligible"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveStatusTab(tab)}
+                  className={`px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${
+                    activeStatusTab === tab
+                      ? "bg-background text-foreground shadow-2xs font-semibold"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <span>{tab}</span>
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-mono">
+                    {counts[tab]}
+                  </Badge>
+                </button>
+              ))}
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {profileMatches.map((s) => {
-                const daysLeft = daysUntil(s.deadline);
-                const isIncomeOk = profile.income <= s.income_limit;
-
-                return (
-                  <Card
-                    key={s.id}
-                    className="flex flex-col justify-between hover:shadow-md transition-all border bg-card hover:border-primary/40"
-                  >
-                    <CardHeader className="p-4 pb-2 space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            {s.isNew && (
-                              <Badge className="bg-emerald-600 text-white text-[10px] font-semibold gap-1 animate-pulse shadow-xs">
-                                <Sparkles className="h-2.5 w-2.5" />
-                                NEW
-                              </Badge>
-                            )}
-                            {s.replacesTitle && (
-                              <Badge
-                                variant="outline"
-                                className="text-[10px] border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 bg-indigo-50/50 dark:bg-indigo-950/30"
-                              >
-                                Replaces Expired
-                              </Badge>
-                            )}
-                            <Badge
-                              variant="secondary"
-                              className={
-                                s.category === "Government"
-                                  ? "bg-emerald-600/10 text-emerald-700 dark:text-emerald-400 border border-emerald-600/20 text-[10px]"
-                                  : "bg-blue-600/10 text-blue-700 dark:text-blue-400 border border-blue-600/20 text-[10px]"
-                              }
-                            >
-                              {s.category === "Government" ? "🏛️ Govt" : "🏢 Private"}
-                            </Badge>
-                            {daysLeft <= 7 && daysLeft >= 0 && (
-                              <DeadlineIndicator deadline={s.deadline} variant="badge" />
-                            )}
-                            <Badge
-                              variant="outline"
-                              className={`text-[10px] ${
-                                isIncomeOk
-                                  ? "border-emerald-500/40 text-emerald-600 bg-emerald-500/10"
-                                  : "border-amber-500/40 text-amber-600 bg-amber-500/10"
-                              }`}
-                            >
-                              {isIncomeOk ? "✓ Income Fit" : "Income Review"}
-                            </Badge>
-                          </div>
-                          <h4 className="font-semibold text-sm leading-snug text-foreground">{s.title}</h4>
-                          <p className="text-xs text-muted-foreground">{s.provider}</p>
-                        </div>
-
-                        <Badge variant="outline" className="font-semibold text-primary border-primary/40 bg-primary/5 text-xs shrink-0">
-                          {s.amount}
-                        </Badge>
-                      </div>
-
-                      <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                        {s.description}
-                      </p>
-                    </CardHeader>
-
-                    <CardContent className="p-4 pt-1 pb-3 space-y-2">
-                      <div className="pt-2 border-t flex items-center justify-between text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          Deadline: <strong className="text-foreground">{s.deadline}</strong>
-                        </span>
-                        <span>{daysLeft} days left</span>
-                      </div>
-                    </CardContent>
-
-                    <div className="p-4 pt-0 flex items-center justify-between gap-2 border-t mt-auto">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleSelectScholarship(s)}
-                        className="text-xs h-8 px-2.5"
-                      >
-                        <Eye className="mr-1.5 h-3.5 w-3.5" />
-                        View Info
-                      </Button>
-
-                      <Button
-                        size="sm"
-                        onClick={() => handleOpenSummary(s)}
-                        className="text-xs h-8 px-2.5 gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-xs"
-                      >
-                        <FileText className="h-3.5 w-3.5" />
-                        <span>Summary PDF</span>
-                      </Button>
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
+            <span className="text-xs text-muted-foreground">
+              Click any scholarship for full matched criteria, unmet criteria & required documents
+            </span>
           </div>
 
-          {/* Educational Note about Application Summary Records */}
-          <div className="p-4 rounded-xl border bg-muted/20 flex items-start gap-3 text-xs text-muted-foreground">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <p className="font-medium text-foreground">Why download the Scholarship Application Summary PDF?</p>
-              <p>
-                The summary PDF compiles your official profile data, verified eligibility criteria, funding details, and standard verification document checklist into a single-page document. Keep it in your personal folder for college office attestations, interview preparation, and application tracking.
-              </p>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filteredEvaluations.map(({ scholarship: s, evaluation }) => (
+              <Card
+                key={s.id}
+                className="flex flex-col justify-between hover:shadow-md transition-all border bg-card"
+              >
+                <CardHeader className="p-4 pb-2 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {evaluation.status === "Eligible" ? (
+                          <Badge className="bg-emerald-600 text-white text-[10px] gap-1 font-mono">
+                            <CheckCircle2 className="h-3 w-3" />
+                            Eligible ({evaluation.compatibilityScore}%)
+                          </Badge>
+                        ) : evaluation.status === "Possibly Eligible" ? (
+                          <Badge className="bg-amber-600 text-white text-[10px] gap-1 font-mono">
+                            <AlertTriangle className="h-3 w-3" />
+                            Possibly Eligible ({evaluation.compatibilityScore}%)
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive" className="text-[10px] gap-1 font-mono">
+                            <XCircle className="h-3 w-3" />
+                            Not Eligible ({evaluation.compatibilityScore}%)
+                          </Badge>
+                        )}
+                        <Badge variant="outline" className="text-[10px]">
+                          {s.region}
+                        </Badge>
+                      </div>
+                      <h4 className="font-semibold text-sm leading-snug text-foreground">{s.title}</h4>
+                      <p className="text-xs text-muted-foreground">{s.provider}</p>
+                    </div>
+
+                    <Badge variant="outline" className="font-mono font-semibold text-primary border-primary/40 bg-primary/5 text-xs shrink-0">
+                      ₹{s.amount.toLocaleString("en-IN")}/yr
+                    </Badge>
+                  </div>
+
+                  {/* Transparent Matched vs Unmet Criteria */}
+                  <div className="space-y-1 pt-1 text-xs">
+                    {evaluation.matchedCriteria.slice(0, 2).map((m, idx) => (
+                      <p key={idx} className="text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                        <CheckCircle2 className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{m}</span>
+                      </p>
+                    ))}
+                    {evaluation.unmetCriteria.map((u, idx) => (
+                      <p key={idx} className="text-rose-700 dark:text-rose-400 flex items-center gap-1">
+                        <XCircle className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{u}</span>
+                      </p>
+                    ))}
+                    {evaluation.missingInformation.map((mi, idx) => (
+                      <p key={idx} className="text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{mi}</span>
+                      </p>
+                    ))}
+                  </div>
+                </CardHeader>
+
+                <CardContent className="p-4 pt-1 pb-3">
+                  <div className="pt-2 border-t flex items-center justify-between text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      Deadline: <strong className="text-foreground">{s.deadline}</strong>
+                    </span>
+                    <span>
+                      {evaluation.missingDocuments.length > 0
+                        ? `${evaluation.missingDocuments.length} docs to prepare`
+                        : "All docs ready"}
+                    </span>
+                  </div>
+                </CardContent>
+
+                <div className="p-4 pt-0 flex items-center justify-between gap-2 border-t mt-auto">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleSelectScholarship(s)}
+                    className="text-xs h-8 px-2.5"
+                  >
+                    <Eye className="mr-1.5 h-3.5 w-3.5" />
+                    Full Breakdown & Apply
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => handleOpenSummary(s)}
+                    className="text-xs h-8 px-2.5 gap-1.5"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    <span>Summary PDF</span>
+                  </Button>
+                </div>
+              </Card>
+            ))}
           </div>
         </div>
       )}
 
-      {/* Scholarship Full Details Drawer */}
       <ScholarshipDetail
         scholarship={selectedScholarship}
         isOpen={isDetailOpen}
         onOpenChange={setDetailOpen}
       />
 
-      {/* Scholarship Application Summary PDF Modal */}
       <ApplicationSummaryModal
         scholarship={summaryScholarship}
         isOpen={isSummaryModalOpen}

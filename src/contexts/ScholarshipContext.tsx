@@ -1,20 +1,30 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+  useCallback,
+  useMemo,
+} from "react";
 import {
   Scholarship,
   ExpiredScholarshipRecord,
+  SuspiciousReportRecord,
+  AdminAuditLogEntry,
   sampleScholarships,
   initialExpiredScholarships,
   rawInitialScholarships,
   updateScholarshipCatalog,
-  replacementScholarships,
-  newlyPublishedScholarships,
+  detectDuplicateScholarship,
 } from "@/lib/data";
 import { useToast } from "@/hooks/use-toast";
 
 interface ScholarshipContextType {
   scholarships: Scholarship[];
+  allCatalogScholarships: Scholarship[];
   expiredArchive: ExpiredScholarshipRecord[];
   newlyPublished: Scholarship[];
   lastCheckedTime: string | null;
@@ -22,25 +32,63 @@ interface ScholarshipContextType {
   isUpdateModalOpen: boolean;
   setUpdateModalOpen: (open: boolean) => void;
   checkForUpdates: (manual?: boolean) => { expiredRemoved: number; newAdded: number };
-  publishScholarship: (newScheme: Omit<Scholarship, "id" | "isNew" | "publishedAt">) => Scholarship;
+  publishScholarship: (
+    newScheme: Omit<Scholarship, "id" | "isNew" | "publishedAt">,
+    actorEmail?: string
+  ) => Scholarship | null;
+  updateScholarshipRecord: (
+    idOrUpdated: number | string | Scholarship,
+    patchOrActorEmail?: Partial<Scholarship> | string,
+    actorEmail?: string
+  ) => void;
+  markScholarshipExpired: (
+    id: number | string,
+    reason?: string,
+    actorEmail?: string
+  ) => void;
   dismissNewAlert: () => void;
-  getScholarshipById: (id: number) => Scholarship | undefined;
+  getScholarshipById: (id: number | string) => Scholarship | undefined;
+  // Saved / Bookmarked scholarships
+  savedIds: (number | string)[];
+  toggleSavedScholarship: (id: number | string) => void;
+  isScholarshipSaved: (id: number | string) => boolean;
+  // Side-by-side comparison list (max 4)
+  comparisonIds: (number | string)[];
+  toggleCompareScholarship: (id: number | string) => void;
+  clearComparison: () => void;
+  // Fraud / Inaccuracy Reporting & Admin Audit Log
+  reports: SuspiciousReportRecord[];
+  submitListingReport: (
+    report: Omit<SuspiciousReportRecord, "id" | "createdAt" | "status">
+  ) => void;
+  resolveListingReport: (
+    reportId: string,
+    status: "Resolved" | "Dismissed",
+    adminNotes?: string,
+    actorEmail?: string
+  ) => void;
+  auditLogs: AdminAuditLogEntry[];
   stats: {
     totalActive: number;
     newlyPublishedCount: number;
     expiredReplacedCount: number;
     govtCount: number;
     privateCount: number;
+    verifiedCount: number;
+    pendingReportsCount: number;
+    openReportsCount: number;
   };
 }
 
 const ScholarshipContext = createContext<ScholarshipContextType | undefined>(undefined);
 
-const STORAGE_SCHOLARSHIPS_KEY = "scholarai_active_scholarships_v4";
-const STORAGE_EXPIRED_KEY = "scholarai_expired_archive_v4";
-const STORAGE_LAST_CHECK_KEY = "scholarai_last_check_v4";
+const STORAGE_SCHOLARSHIPS_KEY = "scholarai_active_scholarships_v5";
+const STORAGE_EXPIRED_KEY = "scholarai_expired_archive_v5";
+const STORAGE_SAVED_KEY = "scholarai_saved_scholarships_v5";
+const STORAGE_COMPARE_KEY = "scholarai_compare_scholarships_v5";
+const STORAGE_REPORTS_KEY = "scholarai_reports_v5";
+const STORAGE_AUDIT_KEY = "scholarai_admin_audit_v5";
 
-// Utility to get current local date string (YYYY-MM-DD)
 function getCurrentDateString(): string {
   const now = new Date();
   const year = now.getFullYear();
@@ -49,174 +97,446 @@ function getCurrentDateString(): string {
   return `${year}-${month}-${day}`;
 }
 
+const initialAuditLogs: AdminAuditLogEntry[] = [
+  {
+    id: "audit-1",
+    timestamp: "2026-11-05T10:30:00.000Z",
+    actorEmail: "mmnagarjunareddy@gmail.com",
+    action: "Verified Official Source",
+    targetTitle: "Telangana ePASS Post-Matric Scholarship (RTF & MTF)",
+    details: "Verified official domain telanganaepass.cgg.gov.in and 2026-27 RTF/MTF guidelines.",
+  },
+  {
+    id: "audit-2",
+    timestamp: "2026-11-04T14:15:00.000Z",
+    actorEmail: "mmnagarjunareddy@gmail.com",
+    action: "Archived Past Deadline",
+    targetTitle: "Infosys Foundation STEM Stars Scholarship",
+    details: "Deadline 2026-10-25 passed. Moved to historical archive without fabricating unconfirmed renewal dates.",
+  },
+];
+
 export function ScholarshipProvider({ children }: { children: ReactNode }) {
   const [scholarships, setScholarships] = useState<Scholarship[]>(sampleScholarships);
-  const [expiredArchive, setExpiredArchive] = useState<ExpiredScholarshipRecord[]>(initialExpiredScholarships);
+  const [expiredArchive, setExpiredArchive] = useState<ExpiredScholarshipRecord[]>(
+    initialExpiredScholarships
+  );
+  const [savedIds, setSavedIds] = useState<(number | string)[]>([1, 4, 15, "1", "4", "15"]);
+  const [comparisonIds, setComparisonIds] = useState<(number | string)[]>([1, 4, 15]);
+  const [reports, setReports] = useState<SuspiciousReportRecord[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AdminAuditLogEntry[]>(initialAuditLogs);
   const [lastCheckedTime, setLastCheckedTime] = useState<string | null>(null);
-  const [hasNewAlert, setHasNewAlert] = useState<boolean>(true);
+  const [hasNewAlert, setHasNewAlert] = useState<boolean>(false);
   const [isUpdateModalOpen, setUpdateModalOpen] = useState<boolean>(false);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const { toast } = useToast();
 
-  // Core update cycle logic
-  const runUpdateCycle = useCallback(
-    (currentList: Scholarship[], currentExpired: ExpiredScholarshipRecord[], manual: boolean = false) => {
+  // Strictly archives expired scholarships WITHOUT fabricating new deadlines
+  const runVerificationPass = useCallback(
+    (
+      currentList: Scholarship[],
+      currentExpired: ExpiredScholarshipRecord[],
+      manual: boolean = false
+    ) => {
       const todayStr = getCurrentDateString();
       const updatedExpired = [...currentExpired];
-      const activeMap = new Map<number, Scholarship>();
+      const activeList: Scholarship[] = [];
       let expiredCount = 0;
-      let newAddedCount = 0;
 
-      // 1. Scan current list for expired items
       for (const item of currentList) {
-        if (item.deadline < todayStr) {
-          // It is expired! Remove it and archive it
-          expiredCount++;
-          const replacement = replacementScholarships[item.id];
+        if (item.deadline < todayStr || item.application_status === "Closed") {
           const alreadyArchived = updatedExpired.some((e) => e.expiredId === item.id);
-
           if (!alreadyArchived) {
+            expiredCount++;
             updatedExpired.unshift({
               expiredId: item.id,
               expiredTitle: item.title,
               provider: item.provider,
               originalDeadline: item.deadline,
               category: item.category,
-              replacementId: replacement?.id,
-              replacementTitle: replacement?.title,
               retiredOn: todayStr,
-              reason: `Deadline of ${item.deadline} has lapsed. Automatically replaced by current active cycle.`,
+              reason: `Verified deadline (${item.deadline}) has passed. Preserved in historical archive pending official provider announcement.`,
             });
           }
-
-          // Insert replacement if available
-          if (replacement && !activeMap.has(replacement.id)) {
-            activeMap.set(replacement.id, { ...replacement, isNew: true });
-            newAddedCount++;
-          }
         } else {
-          activeMap.set(item.id, item);
+          activeList.push(item);
         }
       }
 
-      // 2. Scan catalog for freshly published scholarships that aren't present yet
-      for (const fresh of newlyPublishedScholarships) {
-        if (fresh.deadline >= todayStr && !activeMap.has(fresh.id)) {
-          activeMap.set(fresh.id, { ...fresh, isNew: true });
-          newAddedCount++;
-        }
-      }
+      activeList.sort(
+        (a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
+      );
 
-      const finalizedList = Array.from(activeMap.values()).sort((a, b) => {
-        if (a.isNew && !b.isNew) return -1;
-        if (!a.isNew && b.isNew) return 1;
-        return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+      const timestamp = new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
       });
 
-      setScholarships(finalizedList);
+      setScholarships(activeList);
       setExpiredArchive(updatedExpired);
-      const timeStamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-      setLastCheckedTime(timeStamp);
+      setLastCheckedTime(timestamp);
 
-      if (manual || expiredCount > 0 || newAddedCount > 0) {
-        setHasNewAlert(true);
-      }
-
-      // Save to localStorage
       try {
-        localStorage.setItem(STORAGE_SCHOLARSHIPS_KEY, JSON.stringify(finalizedList));
+        localStorage.setItem(STORAGE_SCHOLARSHIPS_KEY, JSON.stringify(activeList));
         localStorage.setItem(STORAGE_EXPIRED_KEY, JSON.stringify(updatedExpired));
-        localStorage.setItem(STORAGE_LAST_CHECK_KEY, timeStamp);
-      } catch (e) {
-        console.error("Failed saving to localStorage:", e);
+      } catch {
+        // Ignore storage error
       }
 
       if (manual) {
         toast({
-          title: "Scholarship Directory Up to Date",
-          description: `Checked against current deadlines. ${finalizedList.length} active scholarships available (${finalizedList.filter((s) => s.isNew).length} newly published).`,
+          title: "Catalog Verification Complete",
+          description:
+            expiredCount > 0
+              ? `${expiredCount} scholarship(s) past their verified deadline were moved to the Historical Archive. ${activeList.length} verified active schemes available.`
+              : `All ${activeList.length} active scholarships have verified open/upcoming deadlines.`,
         });
       }
 
-      return { expiredRemoved: expiredCount, newAdded: newAddedCount };
+      return { expiredRemoved: expiredCount, newAdded: 0 };
     },
     [toast]
   );
 
-  // Initialize from storage or default on mount
   useEffect(() => {
-    let initialList = sampleScholarships;
+    let initialList = rawInitialScholarships;
     let initialExp = initialExpiredScholarships;
 
     try {
-      const storedScholarships = localStorage.getItem(STORAGE_SCHOLARSHIPS_KEY);
-      const storedExpired = localStorage.getItem(STORAGE_EXPIRED_KEY);
-      const storedLastCheck = localStorage.getItem(STORAGE_LAST_CHECK_KEY);
+      const storedList = localStorage.getItem(STORAGE_SCHOLARSHIPS_KEY);
+      const storedExp = localStorage.getItem(STORAGE_EXPIRED_KEY);
+      const storedSaved = localStorage.getItem(STORAGE_SAVED_KEY);
+      const storedCompare = localStorage.getItem(STORAGE_COMPARE_KEY);
+      const storedReports = localStorage.getItem(STORAGE_REPORTS_KEY);
+      const storedAudit = localStorage.getItem(STORAGE_AUDIT_KEY);
 
-      if (storedScholarships) {
-        const parsed = JSON.parse(storedScholarships);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          initialList = parsed;
-        }
+      if (storedList) {
+        const parsed = JSON.parse(storedList);
+        if (Array.isArray(parsed) && parsed.length > 0) initialList = parsed;
       }
-      if (storedExpired) {
-        const parsedExp = JSON.parse(storedExpired);
-        if (Array.isArray(parsedExp)) {
-          initialExp = parsedExp;
-        }
+      if (storedExp) {
+        const parsedExp = JSON.parse(storedExp);
+        if (Array.isArray(parsedExp)) initialExp = parsedExp;
       }
-      if (storedLastCheck) {
-        setLastCheckedTime(storedLastCheck);
-      }
-    } catch (e) {
-      console.error("Error reading stored scholarships:", e);
+      if (storedSaved) setSavedIds(JSON.parse(storedSaved));
+      if (storedCompare) setComparisonIds(JSON.parse(storedCompare));
+      if (storedReports) setReports(JSON.parse(storedReports));
+      if (storedAudit) setAuditLogs(JSON.parse(storedAudit));
+    } catch {
+      // Fallback to defaults
     }
 
-    // Run dynamic evaluation on mount to purge any newly expired scholarships
-    runUpdateCycle(initialList, initialExp, false);
+    const result = updateScholarshipCatalog(initialList, getCurrentDateString());
+    setScholarships(result.activeScholarships);
+    setExpiredArchive(
+      result.expiredScholarships.length > 0 ? result.expiredScholarships : initialExp
+    );
+    setLastCheckedTime(
+      new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    );
     setIsInitialized(true);
-  }, [runUpdateCycle]);
+  }, []);
 
-  // Manual check for updates
+  useEffect(() => {
+    if (!isInitialized) return;
+    try {
+      localStorage.setItem(STORAGE_SAVED_KEY, JSON.stringify(savedIds));
+      localStorage.setItem(STORAGE_COMPARE_KEY, JSON.stringify(comparisonIds));
+      localStorage.setItem(STORAGE_REPORTS_KEY, JSON.stringify(reports));
+      localStorage.setItem(STORAGE_AUDIT_KEY, JSON.stringify(auditLogs));
+    } catch {
+      // Ignore
+    }
+  }, [savedIds, comparisonIds, reports, auditLogs, isInitialized]);
+
   const checkForUpdates = useCallback(
     (manual: boolean = true) => {
-      return runUpdateCycle(scholarships, expiredArchive, manual);
+      return runVerificationPass(scholarships, expiredArchive, manual);
     },
-    [runUpdateCycle, scholarships, expiredArchive]
+    [scholarships, expiredArchive, runVerificationPass]
   );
 
-  // Publish a new scholarship dynamically
   const publishScholarship = useCallback(
-    (newScheme: Omit<Scholarship, "id" | "isNew" | "publishedAt">): Scholarship => {
+    (
+      newScheme: Omit<Scholarship, "id" | "isNew" | "publishedAt">,
+      actorEmail: string = "mmnagarjunareddy@gmail.com"
+    ): Scholarship | null => {
+      const duplicate = detectDuplicateScholarship(newScheme, scholarships);
+      if (duplicate) {
+        toast({
+          variant: "destructive",
+          title: "Duplicate Scholarship Detected",
+          description: `"${duplicate.title}" by ${duplicate.provider} already exists in the active catalog.`,
+        });
+        return null;
+      }
+
       const todayStr = getCurrentDateString();
-      const newId = Date.now();
-      const createdScholarship: Scholarship = {
+      const created: Scholarship = {
         ...newScheme,
-        id: newId,
+        id: Date.now(),
         isNew: true,
         publishedAt: todayStr,
+        last_verified_at: todayStr,
+        verification_status: newScheme.verification_status || "Verified Source",
+        application_status: newScheme.application_status || "Open",
       };
 
       setScholarships((prev) => {
-        const updated = [createdScholarship, ...prev];
+        const updated = [created, ...prev];
         try {
           localStorage.setItem(STORAGE_SCHOLARSHIPS_KEY, JSON.stringify(updated));
-        } catch (e) {
-          console.error("Failed saving new scholarship to localStorage:", e);
+        } catch {
+          // Ignore
         }
         return updated;
       });
 
-      setHasNewAlert(true);
+      setAuditLogs((prev) => [
+        {
+          id: `audit-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          actorEmail,
+          action: "Published Verified Scholarship",
+          targetTitle: created.title,
+          details: `Added ${created.category} scheme (${created.amount}) with deadline ${created.deadline}.`,
+        },
+        ...prev,
+      ]);
 
+      setHasNewAlert(true);
       toast({
-        title: "🎉 New Scholarship Published!",
-        description: `"${newScheme.title}" is now live and published to all students.`,
+        title: "Scholarship Verified & Published",
+        description: `"${created.title}" is now live in the verified catalog.`,
       });
 
-      return createdScholarship;
+      return created;
+    },
+    [scholarships, toast]
+  );
+
+  const updateScholarshipRecord = useCallback(
+    (
+      idOrUpdated: number | string | Scholarship,
+      patchOrActorEmail?: Partial<Scholarship> | string,
+      actorEmailArg: string = "mmnagarjunareddy@gmail.com"
+    ) => {
+      const todayStr = getCurrentDateString();
+      let targetTitle = "Scholarship";
+      let targetDeadline = "";
+      let targetVerification = "";
+      const actorEmail =
+        typeof patchOrActorEmail === "string"
+          ? patchOrActorEmail
+          : actorEmailArg;
+
+      setScholarships((prev) => {
+        const next = prev.map((s) => {
+          if (typeof idOrUpdated === "object" && idOrUpdated !== null) {
+            if (String(s.id) === String(idOrUpdated.id)) {
+              targetTitle = idOrUpdated.title;
+              targetDeadline = idOrUpdated.deadline;
+              targetVerification = idOrUpdated.verification_status || "Verified Source";
+              return { ...idOrUpdated, last_verified_at: todayStr };
+            }
+            return s;
+          } else {
+            if (String(s.id) === String(idOrUpdated)) {
+              const patch =
+                typeof patchOrActorEmail === "object" && patchOrActorEmail !== null
+                  ? patchOrActorEmail
+                  : {};
+              const merged: Scholarship = {
+                ...s,
+                ...patch,
+                last_verified_at: todayStr,
+              };
+              targetTitle = merged.title;
+              targetDeadline = merged.deadline;
+              targetVerification = merged.verification_status || "Verified Source";
+              return merged;
+            }
+            return s;
+          }
+        });
+        try {
+          localStorage.setItem(STORAGE_SCHOLARSHIPS_KEY, JSON.stringify(next));
+        } catch {
+          // Ignore
+        }
+        return next;
+      });
+
+      setAuditLogs((prev) => [
+        {
+          id: `audit-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          actorEmail,
+          action: "Updated Scholarship Record",
+          targetTitle,
+          details: `Updated deadline (${targetDeadline}) / verification status (${targetVerification}).`,
+        },
+        ...prev,
+      ]);
+
+      toast({
+        title: "Scholarship Updated",
+        description: `Changes to "${targetTitle}" have been saved.`,
+      });
     },
     [toast]
+  );
+
+  const markScholarshipExpired = useCallback(
+    (
+      id: number | string,
+      reason: string = "Marked closed by administrator after official portal check.",
+      actorEmail: string = "mmnagarjunareddy@gmail.com"
+    ) => {
+      const target = scholarships.find((s) => String(s.id) === String(id));
+      if (!target) return;
+      const todayStr = getCurrentDateString();
+
+      setScholarships((prev) => {
+        const next = prev.filter((s) => String(s.id) !== String(id));
+        try {
+          localStorage.setItem(STORAGE_SCHOLARSHIPS_KEY, JSON.stringify(next));
+        } catch {
+          // Ignore
+        }
+        return next;
+      });
+
+      setExpiredArchive((prev) => {
+        const next: ExpiredScholarshipRecord[] = [
+          {
+            expiredId: target.id,
+            expiredTitle: target.title,
+            provider: target.provider,
+            originalDeadline: target.deadline,
+            category: target.category,
+            retiredOn: todayStr,
+            reason,
+          },
+          ...prev,
+        ];
+        try {
+          localStorage.setItem(STORAGE_EXPIRED_KEY, JSON.stringify(next));
+        } catch {
+          // Ignore
+        }
+        return next;
+      });
+
+      setAuditLogs((prev) => [
+        {
+          id: `audit-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          actorEmail,
+          action: "Archived Expired Scholarship",
+          targetTitle: target.title,
+          details: reason,
+        },
+        ...prev,
+      ]);
+
+      toast({
+        title: "Moved to Historical Archive",
+        description: `"${target.title}" has been marked Closed and archived.`,
+      });
+    },
+    [scholarships, toast]
+  );
+
+  const toggleSavedScholarship = useCallback((id: number | string) => {
+    const numId = isNaN(Number(id)) ? Number(String(id).replace(/\D/g, "")) || 1 : Number(id);
+    setSavedIds((prev) =>
+      prev.some((item) => String(item) === String(id) || item === numId)
+        ? prev.filter((item) => String(item) !== String(id) && item !== numId)
+        : [...prev, numId]
+    );
+  }, []);
+
+  const isScholarshipSaved = useCallback(
+    (id: number | string) =>
+      savedIds.some((item) => String(item) === String(id)),
+    [savedIds]
+  );
+
+  const toggleCompareScholarship = useCallback(
+    (id: number | string) => {
+      const numId = isNaN(Number(id)) ? Number(String(id).replace(/\D/g, "")) || 1 : Number(id);
+      setComparisonIds((prev) => {
+        if (prev.some((item) => String(item) === String(id) || item === numId)) {
+          return prev.filter((item) => String(item) !== String(id) && item !== numId);
+        }
+        if (prev.length >= 4) {
+          toast({
+            title: "Comparison Limit Reached (Max 4)",
+            description: "Remove a scholarship from the comparison tray to add another.",
+          });
+          return prev;
+        }
+        return [...prev, numId];
+      });
+    },
+    [toast]
+  );
+
+  const clearComparison = useCallback(() => {
+    setComparisonIds([]);
+  }, []);
+
+  const submitListingReport = useCallback(
+    (report: Omit<SuspiciousReportRecord, "id" | "createdAt" | "status">) => {
+      const created: SuspiciousReportRecord = {
+        ...report,
+        id: `rep-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        status: "Open",
+      };
+      setReports((prev) => [created, ...prev]);
+      toast({
+        title: "Report Sent to Verification Queue",
+        description:
+          "Thank you. Our verification team will review this listing and official source link.",
+      });
+    },
+    [toast]
+  );
+
+  const resolveListingReport = useCallback(
+    (
+      reportId: string,
+      status: "Resolved" | "Dismissed",
+      adminNotes: string = "Reviewed by administrator",
+      actorEmail: string = "mmnagarjunareddy@gmail.com"
+    ) => {
+      const target = reports.find((r) => r.id === reportId);
+      setReports((prev) =>
+        prev.map((r) =>
+          r.id === reportId ? { ...r, status, adminNotes } : r
+        )
+      );
+      if (target) {
+        setAuditLogs((prev) => [
+          {
+            id: `audit-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            actorEmail,
+            action: `Report ${status}`,
+            targetTitle: target.scholarshipTitle,
+            details: `${target.reason}: ${adminNotes}`,
+          },
+          ...prev,
+        ]);
+      }
+      toast({
+        title: `Report Marked as ${status}`,
+        description: "The verification audit log has been updated.",
+      });
+    },
+    [reports, toast]
   );
 
   const dismissNewAlert = useCallback(() => {
@@ -224,70 +544,75 @@ export function ScholarshipProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const getScholarshipById = useCallback(
-    (id: number): Scholarship | undefined => {
-      // Look in active
-      const found = scholarships.find((s) => s.id === id);
-      if (found) return found;
-
-      // Look in raw catalog
-      const rawFound = rawInitialScholarships.find((s) => s.id === id);
-      if (rawFound) return rawFound;
-
-      // Look in replacement pool
-      const replFound = Object.values(replacementScholarships).find((s) => s.id === id);
-      if (replFound) return replFound;
-
-      return undefined;
-    },
+    (id: number | string) =>
+      scholarships.find((s) => String(s.id) === String(id)) ||
+      rawInitialScholarships.find((s) => String(s.id) === String(id)),
     [scholarships]
   );
 
-  // Computed values
-  const newlyPublished = useMemo(() => {
-    return scholarships.filter((s) => s.isNew);
+  const newlyPublished = useMemo(
+    () => scholarships.filter((s) => s.isNew),
+    [scholarships]
+  );
+
+  const allCatalogScholarships = useMemo(() => {
+    const map = new Map<number, Scholarship>();
+    rawInitialScholarships.forEach((s) => map.set(s.id, s));
+    scholarships.forEach((s) => map.set(s.id, s));
+    return Array.from(map.values());
   }, [scholarships]);
 
   const stats = useMemo(() => {
+    const openOrPending = reports.filter(
+      (r) => r.status === "Pending Review" || r.status === "Open"
+    ).length;
     return {
       totalActive: scholarships.length,
-      newlyPublishedCount: scholarships.filter((s) => s.isNew).length,
+      newlyPublishedCount: newlyPublished.length,
       expiredReplacedCount: expiredArchive.length,
       govtCount: scholarships.filter((s) => s.category === "Government").length,
       privateCount: scholarships.filter((s) => s.category === "Private").length,
+      verifiedCount: scholarships.filter(
+        (s) => s.verification_status === "Verified Source"
+      ).length,
+      pendingReportsCount: openOrPending,
+      openReportsCount: openOrPending,
     };
-  }, [scholarships, expiredArchive]);
+  }, [scholarships, newlyPublished, expiredArchive, reports]);
 
-  const value = useMemo(
-    () => ({
-      scholarships,
-      expiredArchive,
-      newlyPublished,
-      lastCheckedTime,
-      hasNewAlert,
-      isUpdateModalOpen,
-      setUpdateModalOpen,
-      checkForUpdates,
-      publishScholarship,
-      dismissNewAlert,
-      getScholarshipById,
-      stats,
-    }),
-    [
-      scholarships,
-      expiredArchive,
-      newlyPublished,
-      lastCheckedTime,
-      hasNewAlert,
-      isUpdateModalOpen,
-      checkForUpdates,
-      publishScholarship,
-      dismissNewAlert,
-      getScholarshipById,
-      stats,
-    ]
+  return (
+    <ScholarshipContext.Provider
+      value={{
+        scholarships,
+        allCatalogScholarships,
+        expiredArchive,
+        newlyPublished,
+        lastCheckedTime,
+        hasNewAlert,
+        isUpdateModalOpen,
+        setUpdateModalOpen,
+        checkForUpdates,
+        publishScholarship,
+        updateScholarshipRecord,
+        markScholarshipExpired,
+        dismissNewAlert,
+        getScholarshipById,
+        savedIds,
+        toggleSavedScholarship,
+        isScholarshipSaved,
+        comparisonIds,
+        toggleCompareScholarship,
+        clearComparison,
+        reports,
+        submitListingReport,
+        resolveListingReport,
+        auditLogs,
+        stats,
+      }}
+    >
+      {children}
+    </ScholarshipContext.Provider>
   );
-
-  return <ScholarshipContext.Provider value={value}>{children}</ScholarshipContext.Provider>;
 }
 
 export function useScholarships() {

@@ -14,8 +14,8 @@ function recommendScholarships(user: UserProfile, list: Scholarship[]): ScoredSc
   const scored = list.map((s) => {
     let score = 0;
     if (s.eligible_courses.includes(user.course)) score += 5;
-    if (user.income <= s.income_limit) score += 4;
-    if (user.marks_percent >= 85 && s.tags.includes("merit")) score += 3;
+    if ((user.income ?? 0) <= s.income_limit) score += 4;
+    if ((user.marks_percent ?? 0) >= 85 && s.tags.includes("merit")) score += 3;
     if (s.tags.includes("stem") && user.course.toLowerCase().includes("bachelor")) score += 2;
     return { ...s, score };
   });

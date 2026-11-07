@@ -10,10 +10,6 @@ export interface SummaryPdfOptions {
   submissionStatus?: string;
 }
 
-/**
- * Generates a clean, simplified 'Scholarship Application Summary' PDF
- * for the user's records based on their profile and selected scholarship details.
- */
 export function generateApplicationSummaryPdf({
   scholarship,
   profile,
@@ -30,33 +26,28 @@ export function generateApplicationSummaryPdf({
   const pageWidth = 210;
   const pageHeight = 297;
   const margin = 14;
-  const contentWidth = pageWidth - margin * 2; // 182 mm
+  const contentWidth = pageWidth - margin * 2;
   let currentY = 0;
 
-  // 1. HEADER BANNER (Deep Indigo / Navy)
-  doc.setFillColor(15, 23, 42); // slate-900
+  doc.setFillColor(15, 23, 42);
   doc.rect(0, 0, pageWidth, 28, "F");
 
-  // Accent Line under header
-  doc.setFillColor(99, 102, 241); // indigo-500
+  doc.setFillColor(99, 102, 241);
   doc.rect(0, 27, pageWidth, 1.5, "F");
 
-  // Header Title
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
   doc.setTextColor(255, 255, 255);
   doc.text("SCHOLARAI • APPLICATION SUMMARY & RECORD", margin, 12);
 
-  // Subtitle
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
-  doc.setTextColor(203, 213, 225); // slate-300
+  doc.setTextColor(203, 213, 225);
   doc.text("Personal Scholarship Record Dossier • Official Student Documentation", margin, 18);
 
-  // Ref ID & Timestamp (Right aligned)
   const refCode = applicationReference?.trim()
     ? applicationReference.trim()
-    : `SCH-${scholarship.id.toUpperCase()}-${new Date().getFullYear()}`;
+    : `SCH-${String(scholarship.id).padStart(4, "0")}-${new Date().getFullYear()}`;
   const todayStr = new Date().toLocaleDateString("en-IN", {
     day: "numeric",
     month: "short",
@@ -73,18 +64,17 @@ export function generateApplicationSummaryPdf({
 
   currentY = 35;
 
-  // 2. STATUS & CATEGORY STRIP
-  doc.setFillColor(241, 245, 249); // slate-100
+  doc.setFillColor(241, 245, 249);
   doc.roundedRect(margin, currentY, contentWidth, 10, 2, 2, "F");
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8.5);
   doc.setTextColor(30, 41, 59);
-  doc.text(`CATEGORY: ${scholarship.category.toUpperCase()} SCHEME`, margin + 4, currentY + 6.5);
+  doc.text(`CATEGORY: ${(scholarship.category || "Government").toUpperCase()} SCHEME`, margin + 4, currentY + 6.5);
 
-  const statusColor = submissionStatus.toLowerCase().includes("applied")
-    ? [22, 163, 74] // emerald-600
-    : [79, 70, 229]; // indigo-600
+  const statusColor = submissionStatus.toLowerCase().includes("submit") || submissionStatus.toLowerCase().includes("award")
+    ? [22, 163, 74]
+    : [79, 70, 229];
   doc.setTextColor(statusColor[0], statusColor[1], statusColor[2]);
   doc.text(`STATUS: ${submissionStatus.toUpperCase()}`, pageWidth - margin - 4, currentY + 6.5, {
     align: "right",
@@ -92,32 +82,26 @@ export function generateApplicationSummaryPdf({
 
   currentY += 15;
 
-  // 3. TARGET SCHOLARSHIP DETAILS SECTION
-  doc.setFillColor(248, 250, 252); // slate-50
-  doc.setDrawColor(226, 232, 240); // slate-200
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
   doc.roundedRect(margin, currentY, contentWidth, 48, 2, 2, "FD");
 
-  // Section Label
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
   doc.setTextColor(71, 85, 105);
   doc.text("1. SCHOLARSHIP OPPORTUNITY DETAILS", margin + 4, currentY + 7);
 
-  // Divider
   doc.setDrawColor(226, 232, 240);
   doc.line(margin + 4, currentY + 9, margin + contentWidth - 4, currentY + 9);
 
-  // Scheme Title
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(15, 23, 42);
   const titleLines = doc.splitTextToSize(scholarship.title, contentWidth - 8);
   doc.text(titleLines[0] || scholarship.title, margin + 4, currentY + 15);
 
-  // Details Grid
   doc.setFontSize(8.5);
 
-  // Left Column
   doc.setFont("helvetica", "bold");
   doc.setTextColor(100, 116, 139);
   doc.text("Funding Body / Provider:", margin + 4, currentY + 22);
@@ -129,18 +113,20 @@ export function generateApplicationSummaryPdf({
   doc.setTextColor(100, 116, 139);
   doc.text("Scholarship Benefit:", margin + 4, currentY + 28);
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(16, 185, 129); // emerald-600
-  const cleanAmount = scholarship.amount.replace(/₹/g, "Rs. ");
+  doc.setTextColor(16, 185, 129);
+  const cleanAmount =
+    typeof scholarship.amount === "number"
+      ? `Rs. ${scholarship.amount.toLocaleString("en-IN")} / yr`
+      : String(scholarship.amount).replace(/₹/g, "Rs. ");
   doc.text(cleanAmount, margin + 46, currentY + 28);
 
   doc.setFont("helvetica", "bold");
   doc.setTextColor(100, 116, 139);
   doc.text("Application Deadline:", margin + 4, currentY + 34);
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(225, 29, 72); // rose-600
+  doc.setTextColor(225, 29, 72);
   doc.text(scholarship.deadline, margin + 46, currentY + 34);
 
-  // Right Column
   const rightColX = margin + 105;
   doc.setFont("helvetica", "bold");
   doc.setTextColor(100, 116, 139);
@@ -161,16 +147,16 @@ export function generateApplicationSummaryPdf({
   doc.setTextColor(100, 116, 139);
   doc.text("Official Portal:", rightColX, currentY + 34);
   doc.setFont("helvetica", "normal");
-  doc.setTextColor(37, 99, 235); // blue-600
-  let displayUrl = scholarship.apply_link;
+  doc.setTextColor(37, 99, 235);
+  const portalLink = scholarship.apply_link || scholarship.link;
+  let displayUrl = portalLink;
   try {
-    displayUrl = new URL(scholarship.apply_link).hostname;
+    displayUrl = new URL(portalLink).hostname;
   } catch {
-    displayUrl = scholarship.apply_link.slice(0, 24);
+    displayUrl = portalLink.slice(0, 24);
   }
   doc.text(displayUrl, rightColX + 28, currentY + 34);
 
-  // One line brief description
   doc.setFont("helvetica", "italic");
   doc.setFontSize(7.5);
   doc.setTextColor(100, 116, 139);
@@ -179,7 +165,6 @@ export function generateApplicationSummaryPdf({
 
   currentY += 53;
 
-  // 4. APPLICANT PROFILE SNAPSHOT SECTION
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(226, 232, 240);
   doc.roundedRect(margin, currentY, contentWidth, 38, 2, 2, "FD");
@@ -192,46 +177,44 @@ export function generateApplicationSummaryPdf({
   doc.setDrawColor(226, 232, 240);
   doc.line(margin + 4, currentY + 9, margin + contentWidth - 4, currentY + 9);
 
-  // Row 1
   doc.setFontSize(8.5);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(100, 116, 139);
   doc.text("Applicant Full Name:", margin + 4, currentY + 16);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(15, 23, 42);
-  doc.text(profile.name?.trim() || "Student Applicant", margin + 40, currentY + 16);
+  doc.text(profile.fullName || profile.name?.trim() || "Student Applicant", margin + 40, currentY + 16);
 
   doc.setFont("helvetica", "bold");
   doc.setTextColor(100, 116, 139);
   doc.text("Current Enrolled Course:", rightColX, currentY + 16);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(15, 23, 42);
-  doc.text(profile.course || "Bachelors Degree", rightColX + 42, currentY + 16);
+  doc.text(`${profile.course || "Undergraduate"} (${profile.state || "India"})`, rightColX + 42, currentY + 16);
 
-  // Row 2
   doc.setFont("helvetica", "bold");
   doc.setTextColor(100, 116, 139);
-  doc.text("Registered Email:", margin + 4, currentY + 23);
+  doc.text("Candidate Category:", margin + 4, currentY + 23);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(15, 23, 42);
-  doc.text(profile.email || "Not specified", margin + 40, currentY + 23);
+  doc.text(profile.category || "General", margin + 40, currentY + 23);
 
   doc.setFont("helvetica", "bold");
   doc.setTextColor(100, 116, 139);
   doc.text("Academic Marks / Score:", rightColX, currentY + 23);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(15, 23, 42);
-  doc.text(`${profile.marks_percent}%`, rightColX + 42, currentY + 23);
+  doc.text(`${profile.marks_percent ?? 75}%`, rightColX + 42, currentY + 23);
 
-  // Row 3
+  const incomeVal = profile.income ?? 0;
   doc.setFont("helvetica", "bold");
   doc.setTextColor(100, 116, 139);
   doc.text("Annual Family Income:", margin + 4, currentY + 30);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(15, 23, 42);
-  doc.text(`Rs. ${profile.income.toLocaleString("en-IN")}`, margin + 40, currentY + 30);
+  doc.text(`Rs. ${incomeVal.toLocaleString("en-IN")}`, margin + 40, currentY + 30);
 
-  const isIncomeEligible = profile.income <= scholarship.income_limit;
+  const isIncomeEligible = incomeVal <= scholarship.income_limit;
   doc.setFont("helvetica", "bold");
   doc.setTextColor(100, 116, 139);
   doc.text("Income Criteria Match:", rightColX, currentY + 30);
@@ -241,12 +224,11 @@ export function generateApplicationSummaryPdf({
     doc.text("PASS (Within Income Limit)", rightColX + 42, currentY + 30);
   } else {
     doc.setTextColor(220, 38, 38);
-    doc.text("REVIEW (Exceeds Standard Ceiling)", rightColX + 42, currentY + 30);
+    doc.text("EXCEEDS CEILING", rightColX + 42, currentY + 30);
   }
 
   currentY += 43;
 
-  // 5. APPLICATION CHECKLIST & MANDATORY DOCUMENTS
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(226, 232, 240);
   doc.roundedRect(margin, currentY, contentWidth, 54, 2, 2, "FD");
@@ -260,12 +242,12 @@ export function generateApplicationSummaryPdf({
   doc.line(margin + 4, currentY + 9, margin + contentWidth - 4, currentY + 9);
 
   const checklistItems = [
-    { title: "Academic Transcripts", desc: "Previous year marksheet & 10th/12th passing certificates" },
-    { title: "Income Certificate", desc: "Current financial year certificate from Tehsildar / Competent Authority" },
-    { title: "Bonafide Student Certificate", desc: "Signed & stamped bonafide/enrolment proof from institute" },
-    { title: "Proof of Identity", desc: "Valid Aadhaar Card / Voter ID / Passport with matching name" },
-    { title: "Bank Account Passbook", desc: "Active Savings A/C in applicant name with IFSC & branch stamp" },
-    { title: "Domicile / Category Proof", desc: "Caste / Minority / State Domicile Certificate (if applicable)" },
+    { title: "Academic Transcripts", desc: "Previous year marksheet & Class 10/12 passing certificates" },
+    { title: "Income Certificate", desc: "Current financial year certificate from Tehsildar / MeeSeva" },
+    { title: "Bonafide Student Certificate", desc: "Signed & stamped admission/enrolment proof from institute" },
+    { title: "Domicile / Residence Proof", desc: "State domicile certificate for state portal verification" },
+    { title: "Bank Account Passbook", desc: "Active student bank A/C linked with NPCI/DBT & IFSC" },
+    { title: "Category Proof (If Applicable)", desc: "Valid Caste / EWS / Disability certificate" },
   ];
 
   doc.setFontSize(8);
@@ -275,12 +257,10 @@ export function generateApplicationSummaryPdf({
     const itemX = col === 0 ? margin + 4 : rightColX;
     const itemY = currentY + 16 + row * 11;
 
-    // Checkbox square
     doc.setDrawColor(100, 116, 139);
     doc.setFillColor(255, 255, 255);
     doc.roundedRect(itemX, itemY - 3.5, 4, 4, 0.5, 0.5, "FD");
 
-    // Item text
     doc.setFont("helvetica", "bold");
     doc.setTextColor(15, 23, 42);
     doc.text(item.title, itemX + 6, itemY);
@@ -294,7 +274,6 @@ export function generateApplicationSummaryPdf({
 
   currentY += 59;
 
-  // 6. APPLICANT LOG & NOTES SECTION
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(226, 232, 240);
   doc.roundedRect(margin, currentY, contentWidth, 42, 2, 2, "FD");
@@ -307,7 +286,6 @@ export function generateApplicationSummaryPdf({
   doc.setDrawColor(226, 232, 240);
   doc.line(margin + 4, currentY + 9, margin + contentWidth - 4, currentY + 9);
 
-  // Fillable Log Fields
   doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(100, 116, 139);
@@ -318,27 +296,17 @@ export function generateApplicationSummaryPdf({
   doc.text("Date Submitted to Portal:", rightColX, currentY + 16);
   doc.line(rightColX + 38, currentY + 16, margin + contentWidth - 4, currentY + 16);
 
-  doc.text("Portal Username / Application ID:", margin + 4, currentY + 23);
-  doc.line(margin + 60, currentY + 23, rightColX - 5, currentY + 23);
-
-  doc.text("Institute Verification Date:", rightColX, currentY + 23);
-  doc.line(rightColX + 38, currentY + 23, margin + contentWidth - 4, currentY + 23);
-
-  // User Notes if provided
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(100, 116, 139);
-  doc.text("Record Notes:", margin + 4, currentY + 30);
+  doc.text("Record Notes:", margin + 4, currentY + 26);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(51, 65, 85);
   const noteText = notes?.trim()
     ? notes.trim()
     : "Keep application acknowledgement receipt, token number, and bank verification SMS saved for tracking.";
   const noteLines = doc.splitTextToSize(noteText, contentWidth - 30);
-  doc.text(noteLines.slice(0, 2), margin + 28, currentY + 30);
+  doc.text(noteLines.slice(0, 2), margin + 28, currentY + 26);
 
   currentY += 48;
 
-  // 7. OFFICIAL LINK & DISCLAIMER FOOTER
   doc.setFillColor(241, 245, 249);
   doc.roundedRect(margin, currentY, contentWidth, 14, 1.5, 1.5, "F");
 
@@ -349,31 +317,27 @@ export function generateApplicationSummaryPdf({
 
   doc.setFont("helvetica", "normal");
   doc.setTextColor(37, 99, 235);
-  const linkText = doc.splitTextToSize(scholarship.apply_link, contentWidth - 55);
-  doc.text(linkText[0] || scholarship.apply_link, margin + 50, currentY + 5.5);
+  const linkText = doc.splitTextToSize(portalLink, contentWidth - 55);
+  doc.text(linkText[0] || portalLink, margin + 50, currentY + 5.5);
 
   doc.setFont("helvetica", "italic");
   doc.setFontSize(6.8);
   doc.setTextColor(100, 116, 139);
   doc.text(
-    "Disclaimer: This summary is generated for personal reference and audit. Submit applications directly via the official portal.",
+    "Disclaimer: Genuine scholarships never charge application fees. Submit applications directly via the official portal.",
     margin + 4,
     currentY + 10.5
   );
 
-  // Page Bottom Watermark / Copyright
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(148, 163, 184);
-  doc.text("ScholarAI Platform • National Scholarship Assistant", margin, pageHeight - 6);
+  doc.text("ScholarAI • Verified Indian Scholarship Assistant", margin, pageHeight - 6);
   doc.text("Page 1 of 1", pageWidth - margin, pageHeight - 6, { align: "right" });
 
   return doc;
 }
 
-/**
- * Convenience helper to download the PDF directly in the browser
- */
 export function downloadApplicationSummaryPdf(options: SummaryPdfOptions): void {
   const doc = generateApplicationSummaryPdf(options);
   const safeName = (options.scholarship.title || "Scholarship")
@@ -386,22 +350,29 @@ export function downloadApplicationSummaryPdf(options: SummaryPdfOptions): void 
   doc.save(fileName);
 }
 
-/**
- * Convenience helper accepting (scholarship, profile) for direct calls
- */
 export function generateScholarshipSummaryPdf(scholarship: Scholarship, profile?: Partial<UserProfile>): void {
   downloadApplicationSummaryPdf({
     scholarship,
     profile: {
       name: profile?.name || "Student Applicant",
+      fullName: profile?.fullName || profile?.name || "Student Applicant",
+      email: profile?.email || "",
       category: profile?.category || "General",
-      gender: profile?.gender || "All",
-      course: profile?.course || "Undergraduate",
-      income: profile?.income ?? 500000,
-      state: profile?.state || "India",
-      tenthPercentage: profile?.tenthPercentage ?? 85,
-      twelfthPercentage: profile?.twelfthPercentage ?? 85,
+      course: profile?.course || "B.Tech",
+      specialization: profile?.specialization || "",
+      education_level: profile?.education_level || "Undergraduate",
+      academic_year: profile?.academic_year || "2nd Year",
+      institution: profile?.institution || "",
+      income: profile?.income ?? 250000,
+      marks_percent: profile?.marks_percent ?? 82,
+      cgpa: profile?.cgpa ?? 8.2,
+      state: profile?.state || "Telangana",
+      gender: profile?.gender || "Any",
+      is_specially_abled: profile?.is_specially_abled ?? false,
+      is_armed_forces_ward: profile?.is_armed_forces_ward ?? false,
+      career_interests: profile?.career_interests || "",
+      completed_documents: profile?.completed_documents || [],
+      preferred_language: profile?.preferred_language || "en",
     },
   });
 }
-

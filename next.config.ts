@@ -2,7 +2,14 @@ import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  /* config options here */
+  serverExternalPackages: [
+    'genkit',
+    '@genkit-ai/core',
+    '@genkit-ai/google-genai',
+    '@genkit-ai/next',
+    '@opentelemetry/sdk-node',
+    '@opentelemetry/api',
+  ],
   typescript: {
     ignoreBuildErrors: true,
   },

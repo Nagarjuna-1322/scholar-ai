@@ -1,0 +1,804 @@
+# MASTER PROMPT — SCHOLAR AI COMPLETE APPLICATION UPGRADE
+
+## PROJECT INFORMATION
+
+**Application Name:** Scholar AI 2.0
+
+**Existing GitHub Repository:** [https://github.com/Nagarjuna-1322/scholar-ai.git](https://github.com/Nagarjuna-1322/scholar-ai.git)
+
+**Project Type:** AI-Powered Scholarship Discovery, Eligibility Matching, and Application Management Platform
+
+**Primary Target Users:** Indian students pursuing school, diploma, undergraduate, postgraduate, engineering, medical, and research education.
+
+## YOUR ROLE
+
+Act as a senior full-stack software engineer, AI engineer, UI/UX designer, Firebase architect, and application security specialist.
+
+Your task is to analyze my existing Scholar AI application and upgrade it into a modern, scalable, secure, and fully functional AI-powered scholarship platform.
+
+Do not create an unrelated application from scratch. Preserve my existing Scholar AI project, architecture, useful components, branding, and working functionality wherever possible.
+
+I want you to implement improvements in the actual application code, not just provide recommendations, documentation, or simulated features.
+
+**IMPORTANT DEVELOPMENT RULES:**
+
+- Inspect the existing project files before making changes.
+- Reuse the current Next.js, React, TypeScript, Tailwind CSS, Firebase, Gemini, and Genkit architecture wherever appropriate.
+- Preserve existing functional features.
+- Fix errors, broken buttons, invalid navigation, and incomplete functionality.
+- Do not invent scholarship information, application deadlines, eligibility requirements, or provider verification.
+- Do not use placeholder data as if it were real scholarship information.
+- Do not automatically commit or push any changes to GitHub.
+- Do not remove existing student information without authorization.
+- Implement real backend functionality rather than UI-only demonstrations.
+- If external credentials, services, or permissions are unavailable, create the integration structure, clearly identify the configuration required, and do not claim that the integration is active.
+- Make the application mobile-responsive, accessible, secure, and suitable for production use.
+
+---
+
+# PRIMARY APPLICATION OBJECTIVE
+
+Transform Scholar AI into an intelligent scholarship assistant that allows students to complete the following journey:
+
+**Student Registration → Profile Creation → Scholarship Discovery → AI Eligibility Checking → Personalized Recommendations → Document Preparation → Official Scholarship Application → Application Tracking → Deadline Notifications**
+
+The entire application must be easy to understand and operate, particularly for students applying for scholarships for the first time.
+
+---
+
+# MODULE 1 — LIVE SCHOLARSHIP DISCOVERY ENGINE
+
+**Priority: CRITICAL**
+
+Upgrade the existing scholarship discovery system to support real, current, and verifiable scholarship data.
+
+### Required Features
+
+1. Discover scholarships from government, university, private foundation, corporate, and other trusted scholarship providers.
+2. Initially prioritize verified Indian scholarship providers, including:
+   - National Scholarship Portal (NSP)
+   - Relevant AICTE scholarship schemes
+   - State government scholarship portals
+   - University scholarship portals
+   - Recognized private scholarship providers
+   - Corporate scholarship and educational assistance programs
+3. Add a searchable scholarship database backed by Firebase Firestore.
+4. Display scholarship title, provider, amount, eligibility criteria, application deadline, education level, required documents, official source, and application link.
+5. Add filters for state, course, degree, academic year, category, income, scholarship amount, scholarship type, and deadline.
+6. Allow students to sort scholarships by relevance, verified closing date, amount, and newly verified opportunities.
+7. Clearly distinguish Open, Closed, Upcoming, and Unverified application statuses.
+8. Automatically identify scholarships whose verified deadlines have passed.
+9. Preserve expired scholarships in a historical archive without incorrectly marking them as active.
+10. Provide the original official source link and the date when each scholarship record was last verified.
+11. Detect duplicate scholarship listings.
+12. Support automatic source checks through authorized APIs, official feeds, or permitted retrieval methods.
+13. Add a verification and administration workflow before newly collected information becomes public.
+14. Never automatically create a new scholarship cycle or deadline without official confirmation.
+15. Provide a fallback experience when live data sources are unavailable.
+
+The existing scholarship catalog in `src/lib/data.ts` should be migrated into a structured data model after verification.
+
+**Expected Result:** Students can easily find legitimate, up-to-date scholarship opportunities using a simple search interface.
+
+---
+
+# MODULE 2 — ADVANCED AI ELIGIBILITY AND MATCHING ENGINE
+
+**Priority: CRITICAL**
+
+Upgrade the existing scholarship matcher into an intelligent and explainable eligibility system.
+
+### Student Profile Fields
+
+Include:
+
+- Student name
+- Course and specialization
+- Education level and academic year
+- College or institution
+- State of residence
+- Academic marks or CGPA
+- Annual family income
+- Scholarship category, where relevant
+- Optional scholarship-specific eligibility information
+- Career and educational interests
+
+Collect sensitive information only when necessary, with appropriate consent and privacy controls.
+
+### Required AI Features
+
+1. Automatically match student profiles with verified scholarship eligibility criteria.
+2. Check compulsory criteria through deterministic validation rules.
+3. Use Gemini AI to explain results and help interpret complex eligibility requirements.
+4. Display three eligibility states:
+   - Eligible based on available verified information
+   - Possibly eligible / Additional details required
+   - Not eligible based on known requirements
+5. Show why each scholarship matches the student.
+6. Explain unmet requirements and missing information.
+7. Display a transparent match score representing profile compatibility, not the probability of receiving an award.
+8. Rank suitable scholarships higher.
+9. Automatically update recommendations when profile details change.
+10. Provide personalized recommendations on the student dashboard.
+11. Support natural-language scholarship searches.
+12. Prevent unsupported AI-generated eligibility claims.
+13. Show the official requirements alongside AI explanations.
+
+Replace inconsistent matching calculations across different components with one shared eligibility evaluation service.
+
+**Expected Result:** A student should be able to discover suitable scholarships after completing their profile, without manually searching through hundreds of irrelevant listings.
+
+---
+
+# MODULE 3 — SECURE STUDENT AUTHENTICATION AND PROFILE MANAGEMENT
+
+**Priority: HIGH**
+
+Implement secure student authentication using Firebase Authentication.
+
+### Required Features
+
+1. Google sign-in.
+2. Email and password authentication.
+3. Password reset and account recovery.
+4. Persistent authenticated sessions.
+5. Secure logout.
+6. Profile creation and editing.
+7. Save student preferences.
+8. Synchronize data across devices.
+9. Allow students to delete their accounts and associated data.
+10. Add appropriate loading, validation, and authentication error handling.
+
+Move user-specific application records, student profiles, saved scholarships, and reminder preferences from browser-only localStorage to protected Firebase storage.
+
+Use secure per-user Firestore rules and enforce role-based permissions.
+
+Offer a safe, consent-based migration path for existing local data.
+
+Do not expose private student information to other users.
+
+---
+
+# MODULE 4 — AI DOCUMENT AND RESUME ANALYZER
+
+**Priority: HIGH**
+
+Develop a document assistant to simplify scholarship preparation.
+
+### Required Features
+
+1. Allow students to upload supported documents such as PDF resumes, mark sheets, and other scholarship-related documents.
+2. Extract relevant details from uploaded documents.
+3. Identify student education, marks, qualifications, and achievements.
+4. Suggest suitable scholarships based on verified extracted information.
+5. Allow students to review and correct all extracted information before it enters their profile.
+6. Generate a scholarship-specific document checklist.
+7. Show missing documents.
+8. Create application preparation summaries.
+9. Support downloadable PDF application summaries.
+
+Implement secure document upload, access controls, file-type checks, file-size limits, and secure storage.
+
+Do not automatically send private documents to scholarship providers.
+
+Do not require Aadhaar documents or other highly sensitive identity information unless essential, legally appropriate, and supported by secure handling.
+
+---
+
+# MODULE 5 — AI SCHOLARSHIP APPLICATION ASSISTANT
+
+**Priority: HIGH**
+
+Guide students through the scholarship application process step by step.
+
+### Required Features
+
+1. Explain how to apply for each scholarship.
+2. Display all verified required documents.
+3. Provide an application preparation checklist.
+4. Explain official application procedures.
+5. Provide links to official application portals.
+6. Explain how to handle missing documentation.
+7. Offer AI assistance while completing applications.
+8. Generate personalized essay drafts from student-confirmed information.
+9. Review and improve student-written scholarship essays and statements of purpose.
+10. Help students prepare clear and professional application summaries.
+11. Provide application-ready checklists and document reminders.
+12. Allow students to save preparation progress.
+
+Avoid fabricating achievements, grades, personal stories, or qualifications.
+
+Do not automatically submit scholarship applications or handle third-party credentials.
+
+**Important:** Clicking an external Apply button must not automatically mark an application as submitted.
+
+---
+
+# MODULE 6 — SMART SCHOLARSHIP APPLICATION TRACKER
+
+**Priority: HIGH**
+
+Upgrade the existing application tracker into a complete scholarship management system.
+
+### Required Application Stages
+
+- Saved
+- Preparing Documents
+- Ready to Apply
+- Application Started
+- Submitted
+- Under Review
+- Shortlisted / Interview
+- Awarded
+- Rejected
+- Withdrawn
+
+### Required Features
+
+1. Let students manually update their application status.
+2. Save application ID or reference number.
+3. Save submission date.
+4. Store application notes.
+5. Track required and completed documents.
+6. Display application history.
+7. Highlight incomplete applications.
+8. Allow filtering by status.
+9. Display progress visually.
+10. Synchronize application data securely.
+11. Provide an optional way to attach submission confirmation.
+12. Distinguish student-entered application status from officially verified status.
+
+Use a clean visual stepper or progress tracker.
+
+Do not falsely claim to retrieve official application statuses without a supported provider integration.
+
+---
+
+# MODULE 7 — AUTOMATED SCHOLARSHIP ALERT AND REMINDER SYSTEM
+
+**Priority: HIGH**
+
+Upgrade the existing calendar and browser notification system into a reliable scheduled notification service.
+
+### Required Features
+
+1. Notify students about newly verified matching scholarships.
+2. Notify students when saved scholarship deadlines are approaching.
+3. Support reminder intervals of 7 days, 3 days, 1 day, and a student-selected interval.
+4. Provide in-app notifications.
+5. Support scheduled email notifications.
+6. Support browser push notifications where technically supported and authorized.
+7. Allow students to enable or disable notifications.
+8. Provide a notification history.
+9. Integrate with Google Calendar through an appropriate authorized process.
+10. Support downloadable calendar events.
+11. Avoid duplicate alerts.
+12. Use correct timezone and deadline handling.
+13. Stop or update reminders when deadlines change or applications close.
+
+Use server-side scheduling where needed.
+
+A notification should only be labeled scheduled after it has genuinely been registered with a working delivery mechanism.
+
+Opening a calendar event template should not be mistaken for successfully saving an event.
+
+---
+
+# MODULE 8 — CONVERSATIONAL AI SCHOLARSHIP ADVISOR
+
+**Priority: HIGH**
+
+Upgrade the existing rule-based chatbot into an intelligent scholarship assistant powered by Gemini.
+
+### Required Capabilities
+
+Students should be able to ask questions such as:
+
+- Which scholarships match my profile?
+- Which government scholarships are available for engineering students?
+- What scholarships are available in Telangana?
+- What documents do I need?
+- Why am I not eligible?
+- Which scholarships are closing soon?
+- How do I apply for this scholarship?
+- Can you compare these scholarships?
+- Help me prepare my scholarship essay.
+- Explain this scholarship in Telugu.
+
+### Implementation Requirements
+
+1. Provide context-aware, conversational responses.
+2. Use verified scholarship data rather than unsupported AI memory.
+3. Provide relevant official source links.
+4. Explain complicated requirements in simple language.
+5. Support follow-up questions.
+6. Use student profile details only with appropriate permissions.
+7. Clearly indicate uncertainty.
+8. Avoid making guarantees about scholarships, eligibility decisions, or awards.
+9. Implement rate limits, error handling, and appropriate safeguards.
+
+Add support for English, Hindi, and Telugu, with an architecture that can support more languages later.
+
+---
+
+# MODULE 9 — COMPLETE STUDENT DASHBOARD REDESIGN
+
+**Priority: HIGH**
+
+Redesign the existing dashboard with a modern, intuitive, and student-friendly interface.
+
+### Dashboard Components
+
+1. Personalized greeting.
+2. Profile completion progress.
+3. Search bar with scholarship filters.
+4. Recommended scholarships.
+5. Saved scholarships.
+6. Applications in progress.
+7. Upcoming application deadlines.
+8. Newly verified scholarships.
+9. Eligibility summaries.
+10. Application tracking overview.
+11. Notifications.
+12. AI assistant access.
+13. Document checklist shortcuts.
+14. Quick links to official application portals.
+
+### Scholarship Card Design
+
+Every scholarship card should display:
+
+- Scholarship title
+- Provider
+- Funding amount
+- Verified deadline
+- Source verification status
+- Eligibility summary
+- Match explanation
+- Save button
+- View details button
+- Official Apply button
+
+### UI/UX Requirements
+
+- Modern, clean, professional design.
+- Continue Scholar AI branding.
+- Consistent typography, spacing, and icons.
+- Mobile-first responsiveness.
+- Clear navigation sidebar on desktop.
+- Simple bottom navigation on mobile, where appropriate.
+- Accessible contrast and keyboard navigation.
+- Light and dark modes.
+- Proper empty states, skeleton loaders, and helpful error messages.
+- Minimal clicks to discover and apply for scholarships.
+- Avoid excessive animations and unnecessary dashboard clutter.
+
+The primary student journey must remain more important than decorative design.
+
+---
+
+# MODULE 10 — SCHOLARSHIP COMPARISON SYSTEM
+
+Allow students to compare multiple scholarships side by side.
+
+Compare:
+
+1. Provider
+2. Scholarship funding
+3. Eligibility
+4. Education level
+5. Income requirements
+6. Academic requirements
+7. Application deadline
+8. Required documents
+9. Application process
+10. Verified official links
+
+Highlight meaningful differences and the reasons a particular scholarship may fit the student better.
+
+Do not display misleading award probabilities.
+
+---
+
+# MODULE 11 — SCHOLARSHIP VERIFICATION AND FRAUD PREVENTION
+
+Create a trustworthy scholarship discovery experience.
+
+### Required Features
+
+1. Verify source domains and scholarship provider information.
+2. Display whether a scholarship listing has been reviewed.
+3. Include last verified date.
+4. Flag outdated or inconsistent information.
+5. Warn users about suspicious links and unusual payment requests.
+6. Validate application links and use safe external navigation.
+7. Allow students to report inaccurate or suspicious listings.
+8. Send reported information to the admin review queue.
+9. Avoid automatically declaring legitimate providers fraudulent without sufficient evidence.
+
+Use clear labels such as Verified Source, Awaiting Verification, and Information Outdated.
+
+---
+
+# MODULE 12 — MULTILINGUAL ACCESSIBILITY
+
+Support:
+
+- English
+- Hindi
+- Telugu
+
+Translate navigation, guidance, help information, notifications, and supported AI responses.
+
+Use properly maintained interface translations and verify the accuracy of critical eligibility or legal information.
+
+Give students an easy language selector.
+
+---
+
+# MODULE 13 — STUDENT FINANCIAL AID PLANNER
+
+Develop a simple financial assistance planning tool.
+
+### Features
+
+1. Enter tuition and estimated education expenses.
+2. Compare scholarship funding amounts.
+3. Estimate potential education cost coverage.
+4. Show remaining estimated education costs.
+5. Compare multiple funding options.
+6. Explain possible restrictions on combining scholarships.
+
+Clearly distinguish estimates from confirmed awards.
+
+---
+
+# MODULE 14 — ADMIN SCHOLARSHIP MANAGEMENT PORTAL
+
+Develop a secure admin dashboard separate from student functionality.
+
+### Admin Features
+
+1. Add scholarship opportunities.
+2. Edit existing scholarship records.
+3. Review automatically discovered opportunities.
+4. Verify official sources and deadlines.
+5. Approve or reject scholarship publication.
+6. Mark scholarships as expired.
+7. Review reported listings.
+8. Track source availability and retrieval errors.
+9. View aggregated application analytics without exposing private student information.
+10. Manage notification templates and delivery status.
+11. Review system health and relevant errors.
+12. Maintain an audit log of important administrative changes.
+
+Only authorized administrators should have these permissions.
+
+Do not expose admin functions through ordinary student accounts.
+
+---
+
+# MODULE 15 — MOBILE EXPERIENCE AND PWA
+
+Make Scholar AI work effectively on mobile phones.
+
+### Required Features
+
+1. Responsive layout for phones, tablets, and desktop.
+2. Fast loading under slower internet conditions.
+3. Progressive Web App installation support.
+4. Proper mobile navigation.
+5. Mobile-friendly form inputs.
+6. Touch-friendly buttons.
+7. Optional safe caching of non-sensitive public scholarship information.
+8. Clear offline states.
+9. Accessible and optimized images.
+10. Appropriate error recovery.
+
+Do not cache confidential student documents or sensitive user data insecurely.
+
+---
+
+# MODULE 16 — TECHNICAL ARCHITECTURE AND SECURITY
+
+Use the existing project as the base.
+
+### Preferred Technologies
+
+**Frontend:** Next.js, React, TypeScript, Tailwind CSS
+
+**AI:** Gemini through Genkit
+
+**Authentication:** Firebase Authentication
+
+**Database:** Cloud Firestore
+
+**File Storage:** Secure Firebase Storage or an equivalent protected storage service
+
+**Backend:** Next.js server-side functionality and appropriate cloud functions/services
+
+**Scheduled Notifications:** Authenticated background jobs or managed scheduling services
+
+### Important Engineering Improvements
+
+1. Use reusable components and clean module separation.
+2. Create shared types and schemas for scholarships, profiles, eligibility decisions, and application records.
+3. Validate user and server inputs.
+4. Create proper Firestore security rules.
+5. Implement role-based authorization.
+6. Keep API credentials on the server.
+7. Add appropriate rate limits to expensive AI operations.
+8. Prevent unauthorized access to student documents.
+9. Use secure file upload processing.
+10. Add loading, error, and retry states.
+11. Handle unavailable scholarship data providers.
+12. Centralize scholarship matching logic.
+13. Avoid duplicated business logic.
+14. Optimize queries and application performance.
+15. Implement logging and monitoring without leaking personal information.
+16. Add appropriate account deletion and data retention controls.
+17. Implement automated tests for critical workflows.
+18. Ensure dependencies and build tools are compatible.
+19. Fix TypeScript, linting, build, and runtime errors.
+20. Preserve existing student data during migrations.
+
+---
+
+# MODULE 17 — ADDITIONAL ADVANCED FEATURES
+
+After completing the core platform, implement or prepare expandable modules for:
+
+- AI resume-based scholarship recommendations
+- AI scholarship essay reviewer
+- Scholarship comparison reports
+- Scholarship funding insights
+- Personalized scholarship discovery preferences
+- Multiple-language AI explanations
+- Secure document vault
+- Saved searches
+- Scholarship bookmarking
+- Student feedback and reporting
+- Application preparation PDF downloads
+- Verified scholarship history
+- Admin analytics
+- Educational institution integrations
+- Enhanced search relevance
+- Accessibility improvements
+
+Do not prioritize these advanced features over accurate data, secure accounts, reliable matching, and a functioning application workflow.
+
+---
+
+# REQUIRED CHANGES TO THE EXISTING PROJECT
+
+Pay particular attention to these existing areas:
+
+### Scholarship Data
+
+`src/lib/data.ts`
+
+Replace reliance on hardcoded scholarship cycles with a verified database-backed catalog.
+
+### Scholarship State
+
+`src/contexts/ScholarshipContext.tsx`
+
+Connect scholarship discovery to the database and prevent fabricated updates.
+
+### Student Profiles
+
+`src/contexts/ProfileContext.tsx`
+
+Add authenticated, secure cloud-backed profile persistence.
+
+### Application Tracking
+
+`src/contexts/ApplicationTrackerContext.tsx`
+
+Persist application records per user, improve statuses, and distinguish application starts from confirmed submissions.
+
+### AI Matching
+
+`src/app/ai-matcher/page.tsx`
+
+Improve eligibility evaluation and explainable matching.
+
+### Recommendations
+
+`src/app/recommendations/page.tsx`
+
+Use the same shared eligibility and recommendation logic as the AI matcher.
+
+### Search
+
+`src/components/ScholarshipSearchBar.tsx`
+
+Add reliable filtering, accurate matching results, and search improvements.
+
+### AI Assistant
+
+`src/components/ChatAssistant.tsx`
+
+Replace limited keyword-based responses with grounded Gemini-powered conversational assistance.
+
+### Reminders
+
+`src/components/SetReminderButton.tsx`
+
+`src/lib/calendar.ts`
+
+Implement genuine reminder scheduling and correct notification confirmation.
+
+### Dashboard
+
+`src/app/dashboard/page.tsx`
+
+Redesign the interface around scholarship discovery and student application progress.
+
+### AI Flows
+
+`src/ai/flows/`
+
+Improve search, eligibility explanations, and essay generation while maintaining proper input validation and grounded AI responses.
+
+### Security
+
+`firestore.rules`
+
+Develop and test secure, least-privilege database rules before enabling user-specific database access.
+
+You may restructure modules if necessary, but preserve existing working functionality and avoid unnecessary rewrites.
+
+---
+
+# DEVELOPMENT PRIORITIES
+
+## PHASE 1 — CORE PLATFORM AND RELIABILITY
+
+Complete first:
+
+1. Scholarship data verification and database migration.
+2. Student authentication and secure cloud storage.
+3. Shared eligibility rule engine.
+4. Existing application tracker fixes.
+5. Critical bugs and broken interactions.
+6. Basic production security.
+
+## PHASE 2 — INTELLIGENT SCHOLARSHIP FEATURES
+
+Implement:
+
+1. AI scholarship matching.
+2. AI eligibility explanations.
+3. Personalized recommendations.
+4. AI scholarship advisor.
+5. Resume and document analysis.
+6. Scholarship-specific application guidance.
+
+## PHASE 3 — COMPLETE STUDENT EXPERIENCE
+
+Implement:
+
+1. Modern dashboard.
+2. Saved scholarships and comparison.
+3. Deadline reminders.
+4. Application progress tracking.
+5. Document preparation tools.
+6. Multilingual interfaces.
+7. Mobile and PWA optimization.
+
+## PHASE 4 — SCALABILITY AND ADVANCED FEATURES
+
+Implement:
+
+1. Admin verification portal.
+2. Fraud and source validation.
+3. Financial aid planner.
+4. Analytics and monitoring.
+5. Additional provider integrations.
+6. Production optimizations and automated testing.
+
+---
+
+# REQUIRED APPLICATION WORKFLOW
+
+When a student opens Scholar AI:
+
+**Step 1:** The student registers or signs in.
+
+**Step 2:** The student completes their educational and scholarship profile.
+
+**Step 3:** Scholar AI discovers available, verified scholarship opportunities.
+
+**Step 4:** The matching engine evaluates the student's information against scholarship requirements.
+
+**Step 5:** The student receives personalized scholarship recommendations with explanations.
+
+**Step 6:** The student opens a scholarship and reviews eligibility, required documents, deadline, and official source.
+
+**Step 7:** The student saves the scholarship or starts preparing the application.
+
+**Step 8:** Scholar AI assists with document preparation and provides the official application link.
+
+**Step 9:** The student confirms when their application has been submitted and records the application details.
+
+**Step 10:** Scholar AI tracks the student's recorded progress and sends relevant reminders.
+
+The student should be able to complete the basic discovery and application preparation journey without advanced technical knowledge.
+
+---
+
+# TESTING AND ACCEPTANCE REQUIREMENTS
+
+Before declaring the upgrade complete:
+
+1. Test authentication and protected routes.
+2. Test student profile creation, editing, and synchronization.
+3. Test scholarship search and filtering.
+4. Test eligibility calculations against known example cases.
+5. Test missing and contradictory eligibility information.
+6. Test scholarship source verification and expired listings.
+7. Test application statuses and submission confirmation.
+8. Test actual notification scheduling and delivery where configured.
+9. Test document upload security and access permissions.
+10. Test AI response reliability and source attribution.
+11. Test all major buttons and navigation routes.
+12. Test mobile and desktop layouts.
+13. Test account isolation and admin permissions.
+14. Run available lint, type-check, build, and automated test commands.
+15. Do not claim success for any test that was not executed.
+
+If an external service or credential is unavailable, clearly identify what remains untested.
+
+---
+
+# FINAL DELIVERABLES
+
+I want an upgraded, working Scholar AI application, not just an architectural proposal.
+
+Provide:
+
+1. Updated application code within the existing project.
+2. Functional frontend and backend integration.
+3. Secure database models and access rules.
+4. Improved AI features.
+5. Modern student dashboard.
+6. Working scholarship search and eligibility matching.
+7. Student application management.
+8. Clear environment configuration instructions.
+9. Testing results and remaining limitations.
+10. A summary of files created, edited, or removed.
+11. A preview of the upgraded application if the development environment supports it.
+
+Clearly distinguish:
+
+- Fully implemented and tested features
+- Implemented features requiring external configuration
+- Partially implemented features
+- Planned features not yet implemented
+
+Do not create false success messages or present demonstrations as real integrations.
+
+If the repository is not accessible directly, work from the imported project files and identify exactly what additional source files are required.
+
+Do not automatically commit, push, deploy, publish, or make irreversible changes without my explicit approval.
+
+---
+
+# FINAL INSTRUCTION
+
+**Build Scholar AI 2.0 as a real, reliable, AI-powered scholarship discovery and application assistance platform for Indian students.**
+
+Prioritize the three most important outcomes:
+
+**1. Students can find real, verified scholarship opportunities.**
+
+**2. Students can understand which scholarships match their eligibility.**
+
+**3. Students can easily prepare, apply, and track their scholarships.**
+
+Maintain a clean architecture, simple user experience, secure data handling, accurate scholarship information, and production-quality engineering throughout development.
+
+Start by reviewing the existing project structure and identifying the necessary changes. Then implement the upgrades in the development order defined above, preserving existing functionality. Do not stop after generating a plan if the development environment supports code editing and testing.
+
+**The final result should be a significantly improved Scholar AI 2.0 application that students can use confidently and easily.**

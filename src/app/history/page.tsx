@@ -2,15 +2,16 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { sampleScholarships, type Scholarship } from "@/lib/data";
+import { type Scholarship } from "@/lib/data";
+import { useScholarships } from "@/contexts/ScholarshipContext";
 import {
   useApplicationTracker,
   ApplicationStatus,
+  ALL_APPLICATION_STATUSES,
 } from "@/contexts/ApplicationTrackerContext";
 import {
   ScholarshipStatusTracker,
   StatusBadge,
-  STATUS_METADATA,
 } from "@/components/ScholarshipStatusTracker";
 import { ScholarshipDetail } from "@/components/ScholarshipDetail";
 import {
@@ -25,72 +26,65 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   Send,
-  CalendarCheck,
   Trophy,
   History as HistoryIcon,
   Search,
   Eye,
   ArrowUpRight,
-  Sparkles,
   Bot,
   Lightbulb,
+  Bell,
+  Trash2,
+  Clock,
 } from "lucide-react";
 import { daysUntil } from "@/lib/utils";
 
 export default function HistoryPage() {
-  const { applications } = useApplicationTracker();
+  const { scholarships } = useScholarships();
+  const { applications, reminders, cancelReminder } = useApplicationTracker();
   const [activeTab, setActiveTab] = useState<"All" | ApplicationStatus>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedScholarship, setSelectedScholarship] = useState<Scholarship | null>(null);
   const [isDetailOpen, setDetailOpen] = useState(false);
 
-  // Combine tracked applications with scholarship information
   const trackedScholarships = useMemo(() => {
     const list: Array<{
       scholarship: Scholarship;
       status: ApplicationStatus;
       updatedAt: string;
+      referenceId?: string;
+      verificationState?: string;
     }> = [];
 
     for (const [idStr, record] of Object.entries(applications)) {
-      const id = Number(idStr);
-      const scholarship = sampleScholarships.find((s) => s.id === id);
+      const scholarship = scholarships.find((s) => String(s.id) === String(idStr));
       if (scholarship && record.status) {
         list.push({
           scholarship,
           status: record.status,
           updatedAt: record.updatedAt,
+          referenceId: record.applicationReferenceId,
+          verificationState: record.verificationState,
         });
       }
     }
 
-    // Sort by latest update first
     return list.sort(
       (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     );
-  }, [applications]);
+  }, [applications, scholarships]);
 
-  // Statistics
   const stats = useMemo(() => {
-    let applied = 0;
-    let interviewing = 0;
-    let awarded = 0;
-
-    for (const item of trackedScholarships) {
-      if (item.status === "Applied") applied++;
-      if (item.status === "Interviewing") interviewing++;
-      if (item.status === "Awarded") awarded++;
+    const counts: Record<string, number> = { All: trackedScholarships.length };
+    for (const st of ALL_APPLICATION_STATUSES) {
+      counts[st] = 0;
     }
-
-    return {
-      total: trackedScholarships.length,
-      applied,
-      interviewing,
-      awarded,
-    };
+    for (const item of trackedScholarships) {
+      counts[item.status] = (counts[item.status] || 0) + 1;
+    }
+    return counts;
   }, [trackedScholarships]);
 
-  // Filtered list
   const filteredList = useMemo(() => {
     return trackedScholarships.filter((item) => {
       const matchesTab = activeTab === "All" || item.status === activeTab;
@@ -99,7 +93,7 @@ export default function HistoryPage() {
         !q ||
         item.scholarship.title.toLowerCase().includes(q) ||
         item.scholarship.provider.toLowerCase().includes(q) ||
-        item.scholarship.tags.some((t) => t.toLowerCase().includes(q));
+        (item.referenceId && item.referenceId.toLowerCase().includes(q));
 
       return matchesTab && matchesSearch;
     });
@@ -112,215 +106,203 @@ export default function HistoryPage() {
 
   return (
     <div className="space-y-8">
-      {/* Page Title & Intro */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Application Tracker & History</h1>
-          <p className="text-muted-foreground mt-1">
-            Track and update your scholarship progress through each milestone: Applied, Interviewing, and Awarded.
+          <h1 className="text-2xl sm:text-3xl font-bold font-headline tracking-tight">
+            10-Stage Smart Application Tracker & Alerts
+          </h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+            Track applications from Saved → Preparing Documents → Ready to Apply → Application Started → Submitted → Under Review → Shortlisted → Awarded / Rejected / Withdrawn.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button asChild variant="outline" size="sm" className="gap-1.5">
+          <Button asChild variant="outline" size="sm" className="gap-1.5 text-xs">
             <Link href="/ai-matcher">
               <Bot className="h-4 w-4 text-primary" />
-              <span>AI Matcher</span>
+              <span>Eligibility Engine</span>
             </Link>
           </Button>
-          <Button asChild size="sm" className="gap-1.5">
-            <Link href="/recommendations">
+          <Button asChild size="sm" className="gap-1.5 text-xs">
+            <Link href="/dashboard">
               <Lightbulb className="h-4 w-4" />
-              <span>Find More</span>
+              <span>Discover More</span>
             </Link>
           </Button>
         </div>
       </div>
 
-      {/* Metrics Overview Cards */}
+      {/* Summary KPI Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {/* Total Tracked */}
-        <Card
-          className="cursor-pointer transition-all hover:border-primary/50"
-          onClick={() => setActiveTab("All")}
-        >
-          <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-xs font-medium text-muted-foreground">
-              Total Tracked
-            </CardTitle>
+        <Card className="cursor-pointer" onClick={() => setActiveTab("All")}>
+          <CardHeader className="p-4 pb-1 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-xs font-medium text-muted-foreground">Total Tracked</CardTitle>
             <HistoryIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-[11px] text-muted-foreground">Scholarships in pipeline</p>
+          <CardContent className="p-4 pt-1">
+            <div className="text-2xl font-bold font-mono">{stats.All}</div>
+            <p className="text-[11px] text-muted-foreground">Across all 10 stages</p>
           </CardContent>
         </Card>
 
-        {/* Applied */}
-        <Card
-          className={`cursor-pointer transition-all hover:border-blue-400 ${
-            activeTab === "Applied" ? "ring-2 ring-blue-500/20 border-blue-500" : ""
-          }`}
-          onClick={() => setActiveTab("Applied")}
-        >
-          <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-xs font-medium text-blue-600 dark:text-blue-400">
-              Applied
-            </CardTitle>
-            <Send className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+        <Card className="cursor-pointer" onClick={() => setActiveTab("Preparing Documents")}>
+          <CardHeader className="p-4 pb-1 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-xs font-medium text-indigo-600">Preparing & Started</CardTitle>
+            <Clock className="h-4 w-4 text-indigo-600" />
           </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-              {stats.applied}
+          <CardContent className="p-4 pt-1">
+            <div className="text-2xl font-bold font-mono text-indigo-700 dark:text-indigo-300">
+              {(stats["Saved"] || 0) +
+                (stats["Preparing Documents"] || 0) +
+                (stats["Ready to Apply"] || 0) +
+                (stats["Application Started"] || 0)}
             </div>
-            <p className="text-[11px] text-muted-foreground">Under initial review</p>
+            <p className="text-[11px] text-muted-foreground">Pre-submission stages</p>
           </CardContent>
         </Card>
 
-        {/* Interviewing */}
-        <Card
-          className={`cursor-pointer transition-all hover:border-amber-400 ${
-            activeTab === "Interviewing" ? "ring-2 ring-amber-500/20 border-amber-500" : ""
-          }`}
-          onClick={() => setActiveTab("Interviewing")}
-        >
-          <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-xs font-medium text-amber-600 dark:text-amber-400">
-              Interviewing
-            </CardTitle>
-            <CalendarCheck className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+        <Card className="cursor-pointer" onClick={() => setActiveTab("Submitted")}>
+          <CardHeader className="p-4 pb-1 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-xs font-medium text-violet-600">Submitted & Review</CardTitle>
+            <Send className="h-4 w-4 text-violet-600" />
           </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <div className="text-2xl font-bold text-amber-700 dark:text-amber-300">
-              {stats.interviewing}
+          <CardContent className="p-4 pt-1">
+            <div className="text-2xl font-bold font-mono text-violet-700 dark:text-violet-300">
+              {(stats["Submitted"] || 0) +
+                (stats["Under Review"] || 0) +
+                (stats["Shortlisted / Interview"] || 0)}
             </div>
-            <p className="text-[11px] text-muted-foreground">Interview / shortlist</p>
+            <p className="text-[11px] text-muted-foreground">Confirmed portal submissions</p>
           </CardContent>
         </Card>
 
-        {/* Awarded */}
-        <Card
-          className={`cursor-pointer transition-all hover:border-emerald-400 ${
-            activeTab === "Awarded" ? "ring-2 ring-emerald-500/20 border-emerald-500" : ""
-          }`}
-          onClick={() => setActiveTab("Awarded")}
-        >
-          <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
-              Awarded
-            </CardTitle>
-            <Trophy className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+        <Card className="cursor-pointer" onClick={() => setActiveTab("Awarded")}>
+          <CardHeader className="p-4 pb-1 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-xs font-medium text-emerald-600">Awarded</CardTitle>
+            <Trophy className="h-4 w-4 text-emerald-600" />
           </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
-              {stats.awarded}
+          <CardContent className="p-4 pt-1">
+            <div className="text-2xl font-bold font-mono text-emerald-700 dark:text-emerald-300">
+              {stats["Awarded"] || 0}
             </div>
-            <p className="text-[11px] text-muted-foreground">Won & granted</p>
+            <p className="text-[11px] text-muted-foreground">Sanctioned scholarships</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filters and Search Toolbar */}
-      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
-        {/* Status Filter Tabs */}
-        <div className="inline-flex p-1 bg-muted rounded-lg text-xs font-medium self-start">
-          {(["All", "Applied", "Interviewing", "Awarded"] as const).map((tab) => {
-            const count =
-              tab === "All"
-                ? stats.total
-                : tab === "Applied"
-                ? stats.applied
-                : tab === "Interviewing"
-                ? stats.interviewing
-                : stats.awarded;
-
-            return (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setActiveTab(tab)}
-                className={`px-3 py-1.5 rounded-md transition-all cursor-pointer flex items-center gap-1.5 ${
-                  activeTab === tab
-                    ? "bg-background text-foreground shadow-sm font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <span>{tab}</span>
-                <span
-                  className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                    activeTab === tab
-                      ? "bg-primary/10 text-primary"
-                      : "bg-muted-foreground/20 text-muted-foreground"
-                  }`}
+      {/* Scheduled Automated Reminders Section */}
+      {reminders.length > 0 && (
+        <Card className="border-amber-200 dark:border-amber-900/50 bg-amber-50/30 dark:bg-amber-950/10">
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-sm font-bold flex items-center gap-2">
+              <Bell className="h-4 w-4 text-amber-600" />
+              Scheduled Multi-Interval Deadline Alerts ({reminders.filter((r) => r.active).length} Active)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 pt-1">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {reminders.map((rem) => (
+                <div
+                  key={rem.scholarshipId}
+                  className="p-2.5 rounded-lg border bg-card flex items-center justify-between gap-2 text-xs"
                 >
-                  {count}
-                </span>
-              </button>
-            );
-          })}
+                  <div className="min-w-0">
+                    <p className="font-semibold truncate">{rem.scholarshipTitle}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Deadline: {rem.deadline} • Alerts: {rem.intervalsDays.join(", ")}d prior
+                    </p>
+                    <Badge
+                      variant={rem.active ? "secondary" : "outline"}
+                      className="text-[9px] mt-1 px-1.5 py-0"
+                    >
+                      {rem.active ? "Active Alert" : "Paused (Application Submitted)"}
+                    </Badge>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => cancelReminder(rem.scholarshipId)}
+                    className="text-muted-foreground hover:text-destructive p-1 shrink-0"
+                    title="Remove reminder"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 10-Stage Filter Pills & Search */}
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-1.5 p-1.5 bg-muted/60 rounded-lg text-xs">
+          {(["All", ...ALL_APPLICATION_STATUSES] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`px-2.5 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1 ${
+                activeTab === tab
+                  ? "bg-primary text-primary-foreground font-semibold shadow-2xs"
+                  : "text-muted-foreground hover:text-foreground bg-background/60"
+              }`}
+            >
+              <span>{tab}</span>
+              <span className="text-[10px] opacity-80 font-mono">({stats[tab] || 0})</span>
+            </button>
+          ))}
         </div>
 
-        {/* Search Filter */}
-        <div className="relative w-full sm:w-64">
+        <div className="relative w-full sm:w-72">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Search tracked scholarships..."
+            placeholder="Search tracked scholarships or Ref ID..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 text-xs sm:text-sm h-9"
+            className="pl-9 text-xs h-9"
           />
         </div>
       </div>
 
-      {/* Tracked Applications List or Empty State */}
+      {/* Tracked Applications List */}
       {filteredList.length === 0 ? (
         <Card className="border-dashed">
-          <CardContent className="py-16">
+          <CardContent className="py-14">
             <div className="flex flex-col items-center justify-center text-center max-w-md mx-auto space-y-3">
-              <div className="p-4 rounded-full bg-primary/10 text-primary">
-                <HistoryIcon className="w-8 h-8" />
+              <div className="p-3 rounded-full bg-primary/10 text-primary">
+                <HistoryIcon className="w-7 h-7" />
               </div>
-              <h3 className="text-lg font-semibold">
-                {stats.total === 0
+              <h3 className="text-base font-semibold">
+                {stats.All === 0
                   ? "No applications tracked yet"
-                  : `No applications with status "${activeTab}"`}
+                  : `No applications in "${activeTab}" stage`}
               </h3>
-              <p className="text-sm text-muted-foreground">
-                {stats.total === 0
-                  ? "Mark scholarships as 'Applied', 'Interviewing', or 'Awarded' from the AI Matcher or Recommendations tabs to track them here."
-                  : `You don't have any scholarships marked as "${activeTab}" right now. Switch tabs or mark a scholarship to see it here.`}
+              <p className="text-xs text-muted-foreground">
+                Select any stage (Saved, Preparing Documents, Application Started, Submitted, etc.) on a scholarship card to track your progress, store your official Application Reference ID, and log portal receipts.
               </p>
-              <div className="pt-3 flex flex-wrap gap-2 justify-center">
-                <Button asChild variant="default" size="sm" className="gap-1.5">
-                  <Link href="/recommendations">
-                    <Lightbulb className="h-4 w-4" />
-                    Browse Recommendations
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" size="sm" className="gap-1.5">
-                  <Link href="/ai-matcher">
-                    <Bot className="h-4 w-4 text-primary" />
-                    AI Scholarship Matcher
-                  </Link>
-                </Button>
-              </div>
+              <Button asChild size="sm" className="mt-2">
+                <Link href="/dashboard">Explore Verified Scholarships</Link>
+              </Button>
             </div>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-6">
           {filteredList.map(({ scholarship, status }) => (
-            <Card key={scholarship.id} className="overflow-hidden border shadow-sm">
+            <Card key={scholarship.id} className="overflow-hidden border shadow-2xs">
               <CardHeader className="pb-3 border-b bg-card">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2.5 flex-wrap">
-                      <CardTitle className="text-lg font-headline">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <CardTitle className="text-base sm:text-lg font-headline">
                         {scholarship.title}
                       </CardTitle>
                       <StatusBadge status={status} />
+                      <Badge variant="outline" className="font-mono text-xs">
+                        ₹{scholarship.amount.toLocaleString("en-IN")}/yr
+                      </Badge>
                     </div>
-                    <CardDescription className="flex items-center gap-2">
+                    <CardDescription className="flex items-center gap-2 text-xs">
                       <span>{scholarship.provider}</span>
                       <span>•</span>
                       <span>Deadline: {scholarship.deadline} ({daysUntil(scholarship.deadline)} days left)</span>
@@ -331,14 +313,14 @@ export default function HistoryPage() {
                       size="sm"
                       variant="outline"
                       onClick={() => handleOpenDetail(scholarship)}
-                      className="gap-1 text-xs"
+                      className="gap-1 text-xs h-8"
                     >
                       <Eye className="h-3.5 w-3.5" />
-                      View Details
+                      Checklist & AI Guide
                     </Button>
-                    <Button asChild size="sm" variant="secondary" className="gap-1 text-xs">
+                    <Button asChild size="sm" variant="secondary" className="gap-1 text-xs h-8">
                       <a
-                        href={scholarship.apply_link}
+                        href={scholarship.apply_link || scholarship.link}
                         target="_blank"
                         rel="noopener noreferrer"
                       >
@@ -350,11 +332,6 @@ export default function HistoryPage() {
                 </div>
               </CardHeader>
               <CardContent className="p-4 sm:p-5 space-y-4">
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  {scholarship.description}
-                </p>
-
-                {/* Embedded Full Stepper Tracker */}
                 <ScholarshipStatusTracker
                   scholarshipId={scholarship.id}
                   scholarshipTitle={scholarship.title}
@@ -366,7 +343,6 @@ export default function HistoryPage() {
         </div>
       )}
 
-      {/* Scholarship Detail Modal */}
       <ScholarshipDetail
         scholarship={selectedScholarship}
         isOpen={isDetailOpen}

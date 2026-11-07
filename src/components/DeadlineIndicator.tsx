@@ -31,18 +31,18 @@ export function DeadlineIndicator({
   const isExpired = daysLeft < 0;
   const isWithin7Days = daysLeft <= 7 && daysLeft >= 0;
 
-  // Format date display (e.g. "15 Sep 2026")
+  // Format date display deterministically across server and client
   const formattedDate = React.useMemo(() => {
-    try {
-      const parts = deadline.split("-");
-      if (parts.length === 3) {
-        const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-        return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const parts = String(deadline).split("-");
+    if (parts.length === 3) {
+      const mIdx = parseInt(parts[1], 10) - 1;
+      const dayNum = parseInt(parts[2], 10);
+      if (months[mIdx] && !isNaN(dayNum)) {
+        return `${months[mIdx]} ${dayNum}, ${parts[0]}`;
       }
-      return deadline;
-    } catch {
-      return deadline;
     }
+    return deadline;
   }, [deadline]);
 
   // Visual progress calculation (based on a 30-day countdown cycle)

@@ -8,10 +8,12 @@ import {
   downloadIcsFile,
   triggerSystemNotification,
 } from "@/lib/calendar";
+import { useApplicationTracker } from "@/contexts/ApplicationTrackerContext";
 import { daysUntil } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -22,7 +24,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Bell,
   Calendar,
@@ -37,18 +38,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface StoredReminder {
-  scholarshipId: number;
-  daysBefore: number;
-  channels: {
-    calendar?: boolean;
-    systemNotification?: boolean;
-  };
-  setAt: string;
-}
-
-const STORAGE_KEY = "scholarai_saved_reminders";
-
 export function SetReminderButton({
   scholarship,
   variant = "default",
@@ -61,136 +50,153 @@ export function SetReminderButton({
   className?: string;
 }) {
   const { toast } = useToast();
+  const tracker = useApplicationTracker();
   const [isOpen, setIsOpen] = useState(false);
-  const [reminderDays, setReminderDays] = useState<number>(1);
-  const [activeReminder, setActiveReminder] = useState<StoredReminder | null>(null);
+  const [selectedIntervals, setSelectedIntervals] = useState<number[]>([7, 3, 1]);
+  const [customDays, setCustomDays] = useState<string>("");
   const [notificationPermission, setNotificationPermission] = useState<string>("default");
 
   const daysLeft = daysUntil(scholarship.deadline);
+  const activeReminder = tracker.getReminder(scholarship.id);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed: Record<number, StoredReminder> = JSON.parse(raw);
-        if (parsed[scholarship.id]) {
-          setActiveReminder(parsed[scholarship.id]);
-          setReminderDays(parsed[scholarship.id].daysBefore);
-        } else {
-          setActiveReminder(null);
-        }
-      }
-    } catch (e) {
-      console.error("Failed to parse stored reminders:", e);
+    if (activeReminder) {
+      setSelectedIntervals(activeReminder.intervalsDays);
     }
-
     if (typeof window !== "undefined" && "Notification" in window) {
       setNotificationPermission(Notification.permission);
     }
-  }, [scholarship.id, isOpen]);
+  }, [activeReminder, isOpen]);
 
-  const saveReminderToStorage = (daysBefore: number, channel: "calendar" | "systemNotification") => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      const map: Record<number, StoredReminder> = raw ? JSON.parse(raw) : {};
-
-      const existing = map[scholarship.id] || {
-        scholarshipId: scholarship.id,
-        daysBefore,
-        channels: {},
-        setAt: new Date().toISOString(),
-      };
-
-      existing.daysBefore = daysBefore;
-      existing.channels[channel] = true;
-      existing.setAt = new Date().toISOString();
-
-      map[scholarship.id] = existing;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
-      setActiveReminder(existing);
-    } catch (e) {
-      console.error("Failed to save reminder:", e);
-    }
+  const toggleInterval = (days: number) => {
+    setSelectedIntervals((prev) =>
+      prev.includes(days) ? prev.filter((d) => d !== days) : [...prev, days].sort((a, b) => b - a)
+    );
   };
 
-  const removeReminder = () => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const map: Record<number, StoredReminder> = JSON.parse(raw);
-        delete map[scholarship.id];
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+  const addCustomInterval = () => {
+    const parsed = parseInt(customDays, 10);
+    if (!isNaN(parsed) && parsed >= 0 && parsed <= 180) {
+      if (!selectedIntervals.includes(parsed)) {
+        setSelectedIntervals((prev) => [...prev, parsed].sort((a, b) => b - a));
       }
-      setActiveReminder(null);
-      toast({
-        title: "Reminder Removed",
-        description: `Cancelled reminder for ${scholarship.title}.`,
-      });
-    } catch (e) {
-      console.error("Failed to remove reminder:", e);
+      setCustomDays("");
     }
   };
+
+  const primaryDaysBefore = selectedIntervals[0] ?? 3;
 
   const eventData: CalendarEventData = {
     title: scholarship.title,
-    description: scholarship.description,
+    description: `${scholarship.description}\nRequired Docs: ${(scholarship.required_documents || []).join(", ")}`,
     deadline: scholarship.deadline,
     provider: scholarship.provider,
-    applyLink: scholarship.apply_link,
-    reminderDaysBefore: reminderDays,
+    applyLink: scholarship.apply_link || scholarship.link,
+    reminderDaysBefore: primaryDaysBefore,
   };
 
-  const handleAddToGoogleCalendar = () => {
+  const handleSaveInAppReminder = () => {
+    const intervals = selectedIntervals.length > 0 ? selectedIntervals : [7, 3, 1];
+    tracker.scheduleReminder({
+      scholarshipId: String(scholarship.id),
+      scholarshipTitle: scholarship.title,
+      deadline: scholarship.deadline,
+      intervalsDays: intervals,
+      channels: {
+        inApp: true,
+        browserPush: notificationPermission === "granted",
+        calendarExported: activeReminder?.channels.calendarExported || false,
+      },
+    });
+    toast({
+      title: "Automated Reminder Scheduled",
+      description: `Configured ${intervals.map((d) => `${d}d`).join(", ")} alerts before ${scholarship.deadline}. Reminders stop automatically once marked Submitted.`,
+    });
+  };
+
+  const handleOpenGoogleCalendarTemplate = () => {
     const url = getGoogleCalendarUrl(eventData);
     window.open(url, "_blank", "noopener,noreferrer");
-    saveReminderToStorage(reminderDays, "calendar");
+    const intervals = selectedIntervals.length > 0 ? selectedIntervals : [7, 3, 1];
+    tracker.scheduleReminder({
+      scholarshipId: String(scholarship.id),
+      scholarshipTitle: scholarship.title,
+      deadline: scholarship.deadline,
+      intervalsDays: intervals,
+      channels: {
+        inApp: true,
+        browserPush: notificationPermission === "granted",
+        calendarExported: true,
+      },
+    });
     toast({
-      title: "Opening Google Calendar",
-      description: "Added deadline event with reminder details to your Google Calendar.",
+      title: "Opened Google Calendar Event Template",
+      description: "Please click 'Save' inside the newly opened Google Calendar tab to finalize adding the event to your calendar.",
     });
   };
 
   const handleDownloadIcs = () => {
     downloadIcsFile(eventData);
-    saveReminderToStorage(reminderDays, "calendar");
+    const intervals = selectedIntervals.length > 0 ? selectedIntervals : [7, 3, 1];
+    tracker.scheduleReminder({
+      scholarshipId: String(scholarship.id),
+      scholarshipTitle: scholarship.title,
+      deadline: scholarship.deadline,
+      intervalsDays: intervals,
+      channels: {
+        inApp: true,
+        browserPush: notificationPermission === "granted",
+        calendarExported: true,
+      },
+    });
     toast({
-      title: "Calendar File Downloaded",
-      description: "Open the downloaded .ics file to add the event to Apple Calendar, Outlook, or your device calendar.",
+      title: "Calendar File (.ics) Downloaded",
+      description: "Open the downloaded .ics file to import this deadline into Apple Calendar, Outlook, or your phone.",
     });
   };
 
   const handleTriggerSystemNotification = async () => {
-    const reminderDateText =
-      reminderDays === 0
-        ? "on the deadline date"
-        : `${reminderDays} day${reminderDays > 1 ? "s" : ""} before the deadline`;
-
+    const intervals = selectedIntervals.length > 0 ? selectedIntervals : [7, 3, 1];
     const res = await triggerSystemNotification({
-      title: `Scholarship Reminder Set: ${scholarship.title}`,
-      body: `Deadline: ${scholarship.deadline} (${daysLeft} days remaining). We'll remind you ${reminderDateText}!`,
+      title: `Scholarship Alert Configured: ${scholarship.title}`,
+      body: `Deadline: ${scholarship.deadline} (${daysLeft} days left). Scheduled alerts: ${intervals.join(", ")} days prior.`,
     });
 
     if (res.status === "granted") {
       setNotificationPermission("granted");
-      saveReminderToStorage(reminderDays, "systemNotification");
+      tracker.scheduleReminder({
+        scholarshipId: String(scholarship.id),
+        scholarshipTitle: scholarship.title,
+        deadline: scholarship.deadline,
+        intervalsDays: intervals,
+        channels: {
+          inApp: true,
+          browserPush: true,
+          calendarExported: activeReminder?.channels.calendarExported || false,
+        },
+      });
       toast({
-        title: "System Notification Active",
-        description: `Notification reminder scheduled for ${scholarship.title}.`,
+        title: "Browser Push + In-App Alerts Active",
+        description: `We will alert you ${intervals.join(", ")} days before ${scholarship.deadline}.`,
       });
     } else if (res.status === "denied") {
       setNotificationPermission("denied");
+      handleSaveInAppReminder();
       toast({
-        variant: "destructive",
-        title: "Notifications Blocked",
-        description:
-          "Browser notifications are currently blocked. Please allow notifications in your browser address bar settings.",
+        title: "Saved to In-App Notification Center",
+        description: "Browser push notifications are blocked by your browser, so alerts are active in your In-App Notification Center.",
       });
     } else {
-      toast({
-        title: "Reminder Saved",
-        description: `Reminder noted locally for ${scholarship.title}.`,
-      });
+      handleSaveInAppReminder();
     }
+  };
+
+  const handleRemoveReminder = () => {
+    tracker.cancelReminder(scholarship.id);
+    toast({
+      title: "Reminder Cancelled",
+      description: `Removed automated alerts for ${scholarship.title}.`,
+    });
   };
 
   return (
@@ -208,8 +214,8 @@ export function SetReminderButton({
         >
           {activeReminder ? (
             <>
-              <BellRing className="h-4 w-4 text-primary animate-pulse" />
-              <span>Reminder Set</span>
+              <BellRing className="h-4 w-4 text-primary" />
+              <span>Alerts On ({activeReminder.intervalsDays.join("/")}d)</span>
             </>
           ) : (
             <>
@@ -226,77 +232,110 @@ export function SetReminderButton({
             <div className="p-2 rounded-full bg-primary/10 text-primary">
               <CalendarPlus className="h-5 w-5" />
             </div>
-            <DialogTitle className="text-lg font-bold">Set Application Deadline Reminder</DialogTitle>
+            <DialogTitle className="text-lg font-bold">Automated Deadline Alert & Calendar</DialogTitle>
           </div>
           <DialogDescription>
-            Add <strong>{scholarship.title}</strong> to your calendar or configure system notifications so you never miss the deadline.
+            Configure multi-interval alerts for <strong>{scholarship.title}</strong>. Alerts automatically pause once your application is marked <em>Submitted</em>.
           </DialogDescription>
         </DialogHeader>
 
-        {/* Scholarship Deadline Banner */}
         <div className="p-3 bg-muted/60 rounded-lg border flex items-center justify-between text-sm">
           <div className="space-y-0.5">
             <p className="font-medium text-foreground">{scholarship.provider}</p>
-            <p className="text-xs text-muted-foreground">Deadline: {scholarship.deadline}</p>
+            <p className="text-xs text-muted-foreground">Official Deadline: {scholarship.deadline}</p>
           </div>
           <Badge variant={daysLeft <= 14 ? "destructive" : "secondary"}>
             <Clock className="h-3 w-3 mr-1" />
-            {daysLeft} days left
+            {daysLeft > 0 ? `${daysLeft} days left` : "Closed"}
           </Badge>
         </div>
 
-        {/* Reminder Timing Preference */}
-        <div className="space-y-3 pt-1">
+        {/* Multi-Interval Checkboxes + Custom Days */}
+        <div className="space-y-2.5 pt-1">
           <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Remind Me
+            Alert Intervals (Select Multiple)
           </Label>
-          <RadioGroup
-            value={String(reminderDays)}
-            onValueChange={(val) => setReminderDays(Number(val))}
-            className="grid grid-cols-2 gap-2"
-          >
+          <div className="grid grid-cols-3 gap-2">
             {[
-              { days: 1, label: "1 Day Before", desc: "Best for final polish" },
-              { days: 3, label: "3 Days Before", desc: "Recommended" },
-              { days: 7, label: "1 Week Before", desc: "Great for essays" },
-              { days: 0, label: "On Deadline Day", desc: "Last-chance submission" },
-            ].map((opt) => (
-              <label
-                key={opt.days}
-                htmlFor={`reminder-opt-${opt.days}`}
-                className={cn(
-                  "flex items-start gap-2.5 p-2.5 rounded-lg border text-xs cursor-pointer transition-colors",
-                  reminderDays === opt.days
-                    ? "border-primary bg-primary/5 text-foreground ring-1 ring-primary/20"
-                    : "border-border hover:bg-muted/50 text-muted-foreground"
-                )}
-              >
-                <RadioGroupItem
-                  value={String(opt.days)}
-                  id={`reminder-opt-${opt.days}`}
-                  className="mt-0.5"
-                />
-                <div className="space-y-0.5">
-                  <span className="font-semibold text-foreground block">{opt.label}</span>
-                  <span className="text-[10px] text-muted-foreground block">{opt.desc}</span>
-                </div>
-              </label>
-            ))}
-          </RadioGroup>
+              { days: 7, label: "7 Days Before", desc: "Document check" },
+              { days: 3, label: "3 Days Before", desc: "Portal upload" },
+              { days: 1, label: "1 Day Before", desc: "Final submit" },
+            ].map((opt) => {
+              const checked = selectedIntervals.includes(opt.days);
+              return (
+                <button
+                  key={opt.days}
+                  type="button"
+                  onClick={() => toggleInterval(opt.days)}
+                  className={cn(
+                    "flex flex-col items-start p-2.5 rounded-lg border text-xs transition-colors text-left",
+                    checked
+                      ? "border-primary bg-primary/10 text-foreground ring-1 ring-primary/30"
+                      : "border-border hover:bg-muted/50 text-muted-foreground"
+                  )}
+                >
+                  <span className="font-semibold text-foreground flex items-center justify-between w-full">
+                    {opt.label}
+                    {checked && <Check className="h-3.5 w-3.5 text-primary" />}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground mt-0.5">{opt.desc}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center gap-2 pt-1">
+            <Input
+              type="number"
+              min={0}
+              max={180}
+              value={customDays}
+              onChange={(e) => setCustomDays(e.target.value)}
+              placeholder="Custom interval (e.g. 14 days before)"
+              className="h-8 text-xs"
+            />
+            <Button type="button" size="sm" variant="outline" onClick={addCustomInterval} className="h-8 text-xs shrink-0">
+              Add Custom
+            </Button>
+          </div>
+          {selectedIntervals.length > 0 && (
+            <p className="text-[11px] text-muted-foreground">
+              Active intervals: <strong>{selectedIntervals.map((d) => `${d} day(s)`).join(", ")}</strong> before deadline.
+            </p>
+          )}
         </div>
 
-        {/* Integration Actions */}
-        <div className="space-y-3 pt-2">
+        <div className="space-y-2.5 pt-2">
           <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Choose Destination
+            Save Alert & Export to Calendar
           </Label>
 
           <div className="grid gap-2">
             <Button
               type="button"
+              variant="default"
+              className="w-full justify-between h-auto py-2.5 px-3.5"
+              onClick={handleTriggerSystemNotification}
+            >
+              <div className="flex items-center gap-3">
+                <Bell className="h-4 w-4 shrink-0" />
+                <div className="text-left">
+                  <p className="text-sm font-semibold">
+                    Activate In-App & Browser Push Reminders
+                  </p>
+                  <p className="text-[11px] opacity-90">
+                    Saves multi-interval alerts to your ScholarAI account
+                  </p>
+                </div>
+              </div>
+              <Check className="h-4 w-4" />
+            </Button>
+
+            <Button
+              type="button"
               variant="outline"
               className="w-full justify-between h-auto py-2.5 px-3.5 hover:border-primary hover:bg-primary/5 group"
-              onClick={handleAddToGoogleCalendar}
+              onClick={handleOpenGoogleCalendarTemplate}
             >
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-md bg-blue-100 dark:bg-blue-950 text-blue-600 flex items-center justify-center shrink-0">
@@ -304,10 +343,10 @@ export function SetReminderButton({
                 </div>
                 <div className="text-left">
                   <p className="text-sm font-semibold text-foreground group-hover:text-primary">
-                    Google Calendar
+                    Open Google Calendar Event Template
                   </p>
                   <p className="text-[11px] text-muted-foreground">
-                    Open pre-filled event in browser
+                    Opens pre-filled Google Calendar tab (click Save in Google Calendar)
                   </p>
                 </div>
               </div>
@@ -326,43 +365,14 @@ export function SetReminderButton({
                 </div>
                 <div className="text-left">
                   <p className="text-sm font-semibold text-foreground group-hover:text-primary">
-                    Apple / Outlook / iCal (.ics)
+                    Download .ICS Calendar File
                   </p>
                   <p className="text-[11px] text-muted-foreground">
-                    Download calendar file with alarm
+                    Works offline with Apple Calendar, Outlook & mobile calendars
                   </p>
                 </div>
               </div>
               <Download className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
-            </Button>
-
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full justify-between h-auto py-2.5 px-3.5 hover:border-primary hover:bg-primary/5 group"
-              onClick={handleTriggerSystemNotification}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-md bg-emerald-100 dark:bg-emerald-950 text-emerald-600 flex items-center justify-center shrink-0">
-                  <Bell className="h-4 w-4" />
-                </div>
-                <div className="text-left">
-                  <div className="flex items-center gap-1.5">
-                    <p className="text-sm font-semibold text-foreground group-hover:text-primary">
-                      System Notifications
-                    </p>
-                    {notificationPermission === "granted" && (
-                      <Badge variant="outline" className="text-[10px] py-0 px-1 bg-emerald-50 text-emerald-700 border-emerald-300">
-                        Active
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    Native browser & desktop alert
-                  </p>
-                </div>
-              </div>
-              <Check className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
             </Button>
           </div>
         </div>
@@ -372,23 +382,23 @@ export function SetReminderButton({
             <div className="flex items-center gap-2">
               <Info className="h-3.5 w-3.5 text-primary" />
               <span>
-                Reminder configured for <strong>{activeReminder.daysBefore} day(s)</strong> before deadline.
+                Scheduled for <strong>{activeReminder.intervalsDays.join(", ")} day(s)</strong> prior.
               </span>
             </div>
             <button
               type="button"
-              onClick={removeReminder}
+              onClick={handleRemoveReminder}
               className="text-destructive hover:underline flex items-center gap-1 text-[11px]"
             >
               <Trash2 className="h-3 w-3" />
-              Remove
+              Cancel
             </button>
           </div>
         )}
 
         <DialogFooter className="sm:justify-between items-center pt-2">
           <p className="text-[11px] text-muted-foreground">
-            Events include link, requirements & provider info.
+            Official portal link & document checklist included.
           </p>
           <Button variant="secondary" size="sm" onClick={() => setIsOpen(false)}>
             Done

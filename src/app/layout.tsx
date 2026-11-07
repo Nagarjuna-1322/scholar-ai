@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
+import { AuthProvider } from '@/contexts/AuthContext';
+import { LanguageProvider } from '@/contexts/LanguageContext';
 import { ProfileProvider } from '@/contexts/ProfileContext';
 import { ApplicationTrackerProvider } from '@/contexts/ApplicationTrackerContext';
 import { ScholarshipProvider } from '@/contexts/ScholarshipContext';
@@ -9,7 +11,14 @@ import { ScholarshipUpdateModal } from '@/components/ScholarshipUpdateModal';
 
 export const metadata: Metadata = {
   title: 'ScholarAI',
-  description: 'AI-Powered Scholarship Finder',
+  description: 'AI-powered scholarship finder and application assistant',
+  openGraph: {
+    title: 'ScholarAI',
+    description: 'AI-powered scholarship finder and application assistant',
+  },
+  verification: {
+    google: 'aae441efdfe9758b',
+  },
 };
 
 export default function RootLayout({
@@ -87,17 +96,19 @@ export default function RootLayout({
         />
       </head>
       <body className="font-body antialiased" suppressHydrationWarning>
-          <ProfileProvider>
-            <ApplicationTrackerProvider>
-              <ScholarshipProvider>
-                <AppLayout>
-                  {children}
-                </AppLayout>
-                <ScholarshipUpdateModal />
-                <Toaster />
-              </ScholarshipProvider>
-            </ApplicationTrackerProvider>
-          </ProfileProvider>
+        <AuthProvider>
+          <LanguageProvider>
+            <ProfileProvider>
+              <ApplicationTrackerProvider>
+                <ScholarshipProvider>
+                  <AppLayout>{children}</AppLayout>
+                  <ScholarshipUpdateModal />
+                  <Toaster />
+                </ScholarshipProvider>
+              </ApplicationTrackerProvider>
+            </ProfileProvider>
+          </LanguageProvider>
+        </AuthProvider>
       </body>
     </html>
   );

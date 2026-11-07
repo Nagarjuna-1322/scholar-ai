@@ -6,10 +6,13 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function daysUntil(dateString: string) {
-  const today = new Date();
-  const d = new Date(dateString + "T23:59:59");
-  // Set hours to 0 to compare dates only
-  today.setHours(0, 0, 0, 0);
-  const diff = Math.ceil((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  return diff;
+  const now = new Date();
+  const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const parts = String(dateString).split("-").map(Number);
+  if (parts.length === 3 && !parts.some(isNaN)) {
+    const targetUtc = Date.UTC(parts[0], parts[1] - 1, parts[2]);
+    return Math.round((targetUtc - todayUtc) / (1000 * 60 * 60 * 24));
+  }
+  const d = new Date(dateString);
+  return Math.ceil((d.getTime() - todayUtc) / (1000 * 60 * 60 * 24));
 }
